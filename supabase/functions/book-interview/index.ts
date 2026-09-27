@@ -10,10 +10,15 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { candidateId, trackingCode, name, email, phone, date, time } = await req.json();
+    const { trackingCode, date, time } = await req.json();
 
-    if (!name || !date || !time) {
-      return new Response(JSON.stringify({ error: "يرجى ملء الحقول المطلوبة" }), {
+    const code = typeof trackingCode === "string" ? trackingCode.trim().toUpperCase() : "";
+    const requestedDate = typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(`${date}T12:00:00Z`) : null;
+    const daysAhead = requestedDate ? (requestedDate.getTime() - Date.now()) / 86400000 : -1;
+    if (!/^TX-[0-9A-F]{32}$/.test(code) || !requestedDate || Number.isNaN(daysAhead) ||
+        daysAhead < 0 || daysAhead > 11 || [5, 6].includes(requestedDate.getUTCDay()) ||
+        !["09:00", "10:00", "11:00", "13:00", "14:00", "15:00"].includes(time)) {
+      return new Response(JSON.stringify({ error: "رمز التتبع أو موعد الحجز غير صالح" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -22,15 +27,10 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Find candidate to get user_id (owner) for the interview record
-    let candidate = null;
-    if (candidateId) {
-      const { data } = await supabase.from("candidates").select("*").eq("id", candidateId).single();
-      candidate = data;
-    } else if (trackingCode) {
-      const { data } = await supabase.from("candidates").select("*").eq("tracking_code", trackingCode.toUpperCase().trim()).single();
-      candidate = data;
-    }
+    // A public candidate UUID does not authorize a booking. The private code does.
+    const { data: candidate, error: candidateError } = await supabase.from("candidates")
+      .select("id, user_id, name, role, stage, company_id").eq("tracking_code", code).limit(1).maybeSingle();
+    if (candidateError) throw candidateError;
 
     if (!candidate) {
       // Create interview without candidate link - use a system approach
@@ -39,17 +39,24 @@ serve(async (req) => {
       });
     }
 
+    const { data: existing, error: existingError } = await supabase.from("interviews")
+      .select("id").eq("candidate_id", candidate.id).eq("date", date).eq("time", time).eq("status", "مجدولة").limit(1);
+    if (existingError) throw existingError;
+    if (existing?.length) return new Response(JSON.stringify({ error: "تم حجز هذا الموعد بالفعل" }), {
+      status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
     // Create interview record
     const { data: interview, error } = await supabase.from("interviews").insert({
       user_id: candidate.user_id,
       candidate_id: candidate.id,
-      candidate_name: name,
+      candidate_name: candidate.name,
       position: candidate.role || "غير محدد",
       date,
       time,
       type: "عن بُعد",
       status: "مجدولة",
-      notes: `تم الحجز ذاتياً بواسطة المرشح${email ? ` | البريد: ${email}` : ""}${phone ? ` | الجوال: ${phone}` : ""}`,
+      notes: "تم الحجز ذاتياً بواسطة المرشح باستخدام رمز التتبع",
     }).select().single();
 
     if (error) {
@@ -66,8 +73,8 @@ serve(async (req) => {
     // Create notification for the recruiter
     await supabase.from("notifications").insert({
       user_id: candidate.user_id,
-      title: `${name} حجز موعد مقابلة`,
-      description: `حجز المرشح ${name} موعد مقابلة يوم ${date} الساعة ${time}`,
+      title: `${candidate.name} حجز موعد مقابلة`,
+      description: `حجز المرشح ${candidate.name} موعد مقابلة يوم ${date} الساعة ${time}`,
       type: "interview",
     });
 

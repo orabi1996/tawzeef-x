@@ -109,11 +109,7 @@ export default function BookInterview() {
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({
-          candidateId: candidate?.id || null,
           trackingCode: candidateId,
-          name: form.name,
-          email: form.email,
-          phone: form.phone,
           date: selectedSlot.date,
           time: selectedSlot.time,
         }),

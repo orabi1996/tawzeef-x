@@ -667,7 +667,7 @@ const SocialButtons = memo(function SocialButtons() {
 });
 
 /* ─── Tenant Status Validation Gatekeeper ─── */
-export async function checkCompanyStatus(user: any): Promise<{ allowed: boolean; reason?: string }> {
+export async function checkCompanyStatus(user: any): Promise<{ allowed: boolean; reason?: string; isAgency?: boolean }> {
   try {
     // Single server-side source of truth: validate_tenant_status RPC
     const { data, error } = await supabase.rpc("validate_tenant_status");
@@ -704,7 +704,7 @@ export async function checkCompanyStatus(user: any): Promise<{ allowed: boolean;
       };
     }
 
-    return { allowed: true };
+    return { allowed: true, isAgency: res.is_agency === true };
   } catch (err) {
     console.error("Critical error during server-side tenant validation (fail-closed):", err);
     // FAIL CLOSED: Strictly deny on unexpected exceptions
@@ -794,60 +794,6 @@ const AuthForm = memo(function AuthForm({ isLogin, setIsLogin, setPendingOtp }: 
         setPendingPassword(form.password);
         let { data: loginData, error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password: form.password });
 
-        // Smart Candidate Phone Password Fallback (if user typed phone with spaces/formatting)
-        if (error && (error.message.includes("Invalid login credentials") || error.message.includes("invalid_credentials"))) {
-          const cleanPhonePass = form.password.replace(/\D/g, "");
-          if (cleanPhonePass && cleanPhonePass !== form.password && cleanPhonePass.length >= 6) {
-            const retry = await supabase.auth.signInWithPassword({ email: normalizedEmail, password: cleanPhonePass });
-            if (retry.data?.session) {
-              loginData = retry.data;
-              error = null;
-            }
-          }
-        }
-
-        // Smart Agency Direct Fallback (Bypasses email rate limit / email confirmation failures)
-        if (error) {
-          try {
-            const { data: matchedAgency } = await supabase
-              .from("agencies" as any)
-              .select("*")
-              .eq("contact_email", normalizedEmail)
-              .maybeSingle();
-
-            if (matchedAgency) {
-              let savedPassword = "";
-              if (matchedAgency.notes && matchedAgency.notes.includes("[PASS:")) {
-                savedPassword = matchedAgency.notes.split("[PASS:")[1]?.split("]")[0] || "";
-              }
-
-              const isPasswordMatch = !savedPassword || savedPassword === form.password || matchedAgency.contact_phone === form.password;
-
-              if (isPasswordMatch) {
-                confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 }, colors: ["#10b981", "#06b6d4", "#f59e0b"] });
-                toast({ title: "تم تسجيل دخول مكتب التوظيف بنجاح ✅", description: `مرحباً بك في بوابة مكتب ${matchedAgency.name}` });
-
-                localStorage.setItem("active_agency_id", matchedAgency.id);
-                localStorage.setItem("active_agency_name", matchedAgency.name);
-                localStorage.setItem("agency_user_email", normalizedEmail);
-
-                setPendingPassword("");
-                setPendingOtp(false);
-                setLoading(false);
-                navigate("/agency");
-                return;
-              } else {
-                toast({ title: "كلمة المرور غير صحيحة ❌", description: "تأكد من كتابة كلمة المرور المحددة للمكتب بشكل صحيح", variant: "destructive" });
-                setPendingOtp(false);
-                setLoading(false);
-                return;
-              }
-            }
-          } catch (fallbackErr) {
-            console.warn("Agency login fallback warning:", fallbackErr);
-          }
-        }
-
         if (error) { setPendingOtp(false); logAuditEvent({ eventType: "login.failed", userEmail: normalizedEmail, details: { reason: error.message } }); throw error; }
 
         // Tenant Company Status & Existence Gatekeeper
@@ -888,7 +834,7 @@ const AuthForm = memo(function AuthForm({ isLogin, setIsLogin, setPendingOtp }: 
         confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 }, colors: ["#10b981", "#06b6d4", "#f59e0b"] });
         toast({ title: "تم تسجيل الدخول بنجاح ✅", description: userRole === "candidate" ? "مرحباً بك في بوابة المتقدمين" : "مرحباً بك في منصة Tawzeef-X" });
         logAuditEvent({ eventType: "login.success", userId: loginData.user?.id, userEmail: normalizedEmail, details: { method: "direct_login_instant" } });
-        navigate(userRole === "candidate" ? "/portal" : userRole === "job_seeker" ? "/seeker-dashboard" : "/dashboard");
+        navigate(tenantCheck.isAgency ? "/agency" : userRole === "candidate" ? "/portal" : userRole === "job_seeker" ? "/seeker-dashboard" : "/dashboard");
         return;
       } else {
         const { data, error } = await supabase.auth.signUp({
@@ -977,7 +923,7 @@ const AuthForm = memo(function AuthForm({ isLogin, setIsLogin, setPendingOtp }: 
       confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 }, colors: ["#10b981", "#06b6d4", "#f59e0b"] });
       toast({ title: "تم التحقق بنجاح ✅" });
       const accountType = loginData.session?.user?.user_metadata?.account_type;
-      navigate(accountType === "job_seeker" ? "/seeker-dashboard" : "/dashboard");
+      navigate(tenantCheck.isAgency ? "/agency" : accountType === "job_seeker" ? "/seeker-dashboard" : "/dashboard");
     } catch (error: any) {
       setOtpShake(true);
       setTimeout(() => setOtpShake(false), 600);

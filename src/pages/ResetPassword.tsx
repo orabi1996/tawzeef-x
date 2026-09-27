@@ -17,6 +17,7 @@ export default function ResetPassword() {
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [token, setToken] = useState("");
   const [email, setEmail] = useState("");
+  const [hasAuthSession, setHasAuthSession] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -26,6 +27,11 @@ export default function ResetPassword() {
     const e = params.get("email") || "";
     setToken(t);
     setEmail(e);
+    supabase.auth.getSession().then(({ data }) => setHasAuthSession(!!data.session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setHasAuthSession(!!session);
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -38,18 +44,26 @@ export default function ResetPassword() {
       toast({ title: "خطأ", description: "كلمة المرور يجب أن تكون 6 أحرف على الأقل", variant: "destructive" });
       return;
     }
-    if (!token || !email) {
+    if ((!token || !email) && !hasAuthSession) {
       toast({ title: "خطأ", description: "رابط إعادة تعيين كلمة المرور غير صالح أو منتهي الصلاحية", variant: "destructive" });
       return;
     }
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("execute-password-reset", {
-        body: { email, token, password },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (token && email) {
+        const { data, error } = await supabase.functions.invoke("execute-password-reset", {
+          body: { email, token, password },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+      } else {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) throw new Error("انتهت صلاحية رابط الدعوة، اطلب دعوة جديدة.");
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) throw error;
+        await supabase.auth.signOut();
+      }
 
       setSuccess(true);
       setTimeout(() => navigate("/auth?mode=login"), 2500);

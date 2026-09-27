@@ -230,18 +230,14 @@ export default function StageActions(props: StageActionsProps) {
 
   const triggerAIEvaluation = async () => {
     try {
-      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/evaluate-candidate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({ candidateId, jobId }),
+      const { error } = await supabase.functions.invoke("evaluate-candidate", {
+        body: { candidateId, jobId },
       });
+      if (error) throw error;
       await queryClient.invalidateQueries({ queryKey: ["candidates"] });
       toast({ title: "تم تشغيل التقييم الذكي تلقائياً ✅" });
-    } catch {
-      // silent fail
+    } catch (error) {
+      console.error("Automatic AI evaluation failed:", error);
     }
   };
 
@@ -893,10 +889,10 @@ export default function StageActions(props: StageActionsProps) {
 
       // 7. Trigger email notification via notify-stage-change
       const { data: sessionData } = await supabase.auth.getSession();
-      const authToken = sessionData.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const authToken = sessionData.session?.access_token;
 
       try {
-        fetch(
+        if (authToken) await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/notify-stage-change`,
           {
             method: "POST",
@@ -1007,10 +1003,10 @@ export default function StageActions(props: StageActionsProps) {
       }
 
       const { data: sessionData } = await supabase.auth.getSession();
-      const authToken = sessionData.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const authToken = sessionData.session?.access_token;
 
       try {
-        fetch(
+        if (authToken) await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/notify-stage-change`,
           {
             method: "POST",

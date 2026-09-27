@@ -334,26 +334,26 @@ export default function ApplyJob() {
       setCurrentStep(2);
       return;
     }
+    if (!id || !job || !getJobAvailability(job).isOpen) {
+      toast({ title: "هذه الوظيفة غير متاحة للتقديم الآن", variant: "destructive" });
+      return;
+    }
 
     setSubmitting(true);
+    try {
     let resumeUrl: string | null = null;
 
     // Upload CV to Storage Bucket
     if (resumeFile) {
       const ext = (resumeFile.name.split(".").pop() || "").toLowerCase();
-      const filePath = `applications/${id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      try {
-        const { error: uploadError } = await supabase.storage.from("resumes").upload(filePath, resumeFile, { upsert: false });
-        if (!uploadError) {
-          const { data: pubData } = supabase.storage.from("resumes").getPublicUrl(filePath);
-          resumeUrl = pubData?.publicUrl || filePath;
-        }
-      } catch (err) {
-        console.warn("Resume storage upload notice:", err);
-      }
+      const filePath = `applications/${id}/${crypto.randomUUID()}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from("resumes").upload(filePath, resumeFile, { upsert: false });
+      if (uploadError) throw uploadError;
+      // This bucket is private; recruiters request a signed URL when viewing it.
+      resumeUrl = filePath;
     }
 
-    const generatedTrackingCode = "TX-" + Math.floor(100000 + Math.random() * 900000);
+    const generatedTrackingCode = "TX-" + crypto.randomUUID().replace(/-/g, "").toUpperCase();
 
     const cleanEmail = form.email.trim().toLowerCase();
     const cleanPhone = form.phone.trim();
@@ -376,87 +376,18 @@ export default function ApplyJob() {
       demo_video_url: form.demoVideoUrl || null,
     };
 
-    let finalTrackingCode = generatedTrackingCode;
+    const { error: appError } = await supabase.from("applications").insert(payload);
+    if (appError) throw appError;
 
-    // 1. Insert into applications table
-    try {
-      const { error: appErr } = await supabase.from("applications").insert(payload);
-      if (appErr) {
-        console.warn("Retrying application insert with basic payload:", appErr);
-        await supabase.from("applications").insert({
-          job_id: id,
-          company_id: job?.company_id || null,
-          name: form.name.trim(),
-          email: cleanEmail,
-          phone: cleanPhone,
-          experience: form.experience || null,
-          cover_letter: form.coverLetter || null,
-          resume_url: resumeUrl,
-          skills: skills.length > 0 ? skills : null,
-          specialty: form.currentTitle || job?.title || null,
-          tracking_code: generatedTrackingCode,
-        });
-      }
-    } catch (e) {
-      console.warn("Applications insert notice:", e);
-    }
-
-    // 2. Insert or update candidate in Candidates table (non-blocking)
-    try {
-      const expNum = parseInt(form.experience || "0", 10) || 0;
-      let calculatedScore = 74;
-      if (expNum >= 5) calculatedScore += 14;
-      else if (expNum >= 2) calculatedScore += 8;
-      if (skills.length >= 3) calculatedScore += 8;
-      if (form.licenseNumber) calculatedScore += 4;
-      calculatedScore = Math.min(96, calculatedScore);
-
-      const calculatedAiEvaluation = {
-        score: calculatedScore,
-        skillsMatchScore: skills.length > 0 ? 88 : 72,
-        experienceMatchScore: expNum >= 3 ? 92 : 78,
-        educationMatchScore: form.universityDegree ? 90 : 75,
-        culturalFitScore: 86,
-        summary: `تم تحليل ملف المرشح ${form.name} بنسبة توافق ${calculatedScore}% مع متطلبات الوظيفة.`,
-        strengths: [
-          `خبرة مهنية (${form.experience || "مناسبة"} سنوات)`,
-          skills.length > 0 ? `المهارات: ${skills.slice(0, 4).join("، ")}` : "مؤهل متوافق",
-          form.universityDegree ? `المؤهل الأكاديمي: ${form.universityDegree}` : "بيانات مكتملة",
-        ],
-        weaknesses: ["إجراء المقابلة الشخصية للتحقق والمواءمة النهائية"],
-        recommendation: calculatedScore >= 80 ? "موصى به بقوة للمقابلة" : "مناسب للفرز الأولي",
-      };
-
-      // Ensure candidates table has the tracking code, score, and credentials
-      await supabase.from("candidates").update({
-        ai_score: calculatedScore,
-        ai_evaluation: JSON.stringify(calculatedAiEvaluation),
-        tracking_code: finalTrackingCode,
-        license_number: form.licenseNumber || null,
-        license_expiry: form.licenseExpiry || null,
-        university_degree: form.universityDegree || null,
-        demo_video_url: form.demoVideoUrl || null,
-        resume_url: resumeUrl || undefined,
-      } as any).eq("job_id", id).ilike("email", cleanEmail);
-    } catch (e) {
-      console.warn("Direct candidate update notice:", e);
-    }
-
-    // 3. Always trigger account creation and AI evaluation
-    supabase.functions.invoke("auto-create-candidate-account", {
-      body: {
-        email: cleanEmail,
-        phone: cleanPhone,
-        name: form.name.trim(),
-        tracking_code: finalTrackingCode,
-        job_title: job?.title,
-      },
-    }).catch(err => console.warn("Auto account creation notice:", err));
-
-    setTrackingCode(finalTrackingCode);
+    setTrackingCode(generatedTrackingCode);
     setSubmitted(true);
-    setSubmitting(false);
     toast({ title: "تم تقديم طلبك بنجاح ✅" });
+    } catch (error) {
+      console.error("Application submission failed:", error);
+      toast({ title: "فشل إرسال الطلب", description: "لم يتم حفظ الطلب. حاول مرة أخرى.", variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loading) {

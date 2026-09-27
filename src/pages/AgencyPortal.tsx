@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Building2, Users, Plus, UploadCloud, FileText, CheckCircle2, ShieldCheck, Mail, Phone, MapPin, ExternalLink, Loader2, Sparkles, UserPlus } from "lucide-react";
 import { useMyAgencies, useAgencyCandidates } from "@/hooks/useAgencies";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
@@ -35,23 +35,6 @@ export default function AgencyPortal() {
     notes: ""
   });
 
-  // Query jobs available to the agency
-  const jobsQuery = useQuery({
-    queryKey: ["agency-active-jobs"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("jobs")
-        .select("id, title, department, location, type, company_id")
-        .order("created_at", { ascending: false })
-        .limit(20);
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!user,
-  });
-
-  const activeJobs = jobsQuery.data || [];
-
   const handleUploadCandidateResume = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -59,19 +42,15 @@ export default function AgencyPortal() {
     setUploadingResume(true);
     try {
       const ext = (file.name.split(".").pop() || "").toLowerCase();
-      const filePath = `agency_${user!.id}/cand_${Date.now()}.${ext}`;
+      const filePath = `agency_${user!.id}/cand_${crypto.randomUUID()}.${ext}`;
 
       const { error: uploadErr } = await supabase.storage
         .from("resumes")
-        .upload(filePath, file, { cacheControl: "3600", upsert: true });
+        .upload(filePath, file, { cacheControl: "3600", upsert: false });
 
       if (uploadErr) throw uploadErr;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from("resumes")
-        .getPublicUrl(filePath);
-
-      setCandForm(prev => ({ ...prev, resumeUrl: publicUrl }));
+      setCandForm(prev => ({ ...prev, resumeUrl: filePath }));
       toast({ title: "تم رفع السيرة الذاتية بنجاح 📁" });
     } catch (err: any) {
       toast({ title: "خطأ في رفع الملف", description: err.message, variant: "destructive" });
@@ -89,37 +68,10 @@ export default function AgencyPortal() {
 
     setSubmitting(true);
     try {
-      // 1. Insert into candidates table
-      const { data: newCand, error: candErr } = await supabase
-        .from("candidates")
-        .insert({
-          name: candForm.name,
-          email: candForm.email,
-          phone: candForm.phone,
-          role: candForm.role || "مرشح مكتب توظيف",
-          agency_id: selectedAgencyId,
-          stage: "تقديم الطلب",
-          status: "جديد",
-          tracking_code: `AGY-${Math.floor(100000 + Math.random() * 900000)}`
-        } as any)
-        .select()
-        .single();
-
-      if (candErr) throw candErr;
-
-      const candidateId = (newCand as any).id;
-
-      // 2. Link candidate to agency assignment if company_id is known
-      const defaultCompany = activeJobs[0]?.company_id;
-      if (defaultCompany) {
-        await supabase.from("agency_assignments" as any).insert({
-          agency_id: selectedAgencyId,
-          company_id: defaultCompany,
-          candidate_id: candidateId,
-          scope: "candidate",
-          status: "active"
-        } as any);
-      }
+      const { data, error } = await supabase.functions.invoke("submit-agency-candidate", {
+        body: { agencyId: selectedAgencyId, ...candForm },
+      });
+      if (error || !data?.success) throw error || new Error(data?.error || "تعذر رفع المرشح");
 
       qc.invalidateQueries({ queryKey: ["agency-candidates"] });
       toast({ title: "تم رفع وتوفير المرشح للشركة بنجاح! 🚀" });
@@ -191,7 +143,6 @@ export default function AgencyPortal() {
             key={agency.id} 
             agencyId={agency.id} 
             agencyName={agency.name} 
-            activeJobs={activeJobs}
             onOpenSubmit={() => {
               setSelectedAgencyId(agency.id);
               setOpenSubmitCandidate(true);
@@ -292,7 +243,7 @@ export default function AgencyPortal() {
   );
 }
 
-function AgencySection({ agencyId, agencyName, activeJobs, onOpenSubmit }: { agencyId: string; agencyName: string; activeJobs: any[]; onOpenSubmit: () => void }) {
+function AgencySection({ agencyId, agencyName, onOpenSubmit }: { agencyId: string; agencyName: string; onOpenSubmit: () => void }) {
   const { data: candidates = [] } = useAgencyCandidates(agencyId);
 
   return (

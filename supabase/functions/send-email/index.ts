@@ -65,10 +65,13 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const isServiceCall = token === serviceKey;
     let callerId: string | null = null;
+    let callerClient: ReturnType<typeof createClient> | null = null;
 
     if (!isServiceCall) {
-      const supabaseAnon = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!);
-      const { data: { user }, error: userErr } = await supabaseAnon.auth.getUser(token);
+      callerClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+        global: { headers: { Authorization: `Bearer ${token}` } },
+      });
+      const { data: { user }, error: userErr } = await callerClient.auth.getUser();
       if (userErr || !user) {
         return new Response(JSON.stringify({ error: "Unauthorized: Invalid token" }), {
           status: 401,
@@ -91,17 +94,36 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // If not service call, verify sender relationship to user_id
+    // Only an active tenant member or platform administrator may send emails
+    // through the system SMTP account.
     if (!isServiceCall && callerId) {
+      const [{ data: platformRole, error: platformError }, { data: callerMemberships, error: membershipError }] = await Promise.all([
+        supabase.from("platform_roles").select("role").eq("user_id", callerId).eq("role", "super_admin").maybeSingle(),
+        supabase.from("company_members").select("company_id").eq("user_id", callerId),
+      ]);
+      if (platformError || membershipError) throw platformError || membershipError;
+      let companyIds = (callerMemberships || []).map((membership) => membership.company_id);
+      if (!platformRole && !companyIds.length) {
+        return new Response(JSON.stringify({ error: "Forbidden: active company membership required" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (!platformRole && companyIds.length) {
+        const { data: activeCompanies, error: companyError } = await supabase.from("companies")
+          .select("id").in("id", companyIds).eq("status", "active");
+        if (companyError) throw companyError;
+        if (!activeCompanies?.length) return new Response(JSON.stringify({ error: "Company is inactive" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+        companyIds = activeCompanies.map((company) => company.id);
+      }
       const targetUserId = user_id || callerId;
       if (targetUserId !== callerId) {
-        // Check if caller is Super Admin
-        const { data: roleData } = await supabase.from("user_roles").select("role").eq("user_id", callerId).eq("role", "admin").maybeSingle();
-        if (!roleData) {
-          // Check if same company
-          const { data: callerMember } = await supabase.from("company_members").select("company_id").eq("user_id", callerId).maybeSingle();
-          const { data: targetMember } = await supabase.from("company_members").select("company_id").eq("user_id", targetUserId).maybeSingle();
-          if (!callerMember || !targetMember || callerMember.company_id !== targetMember.company_id) {
+        if (!platformRole) {
+          const { data: targetMemberships, error: targetError } = await supabase.from("company_members")
+            .select("company_id").eq("user_id", targetUserId).in("company_id", companyIds);
+          if (targetError) throw targetError;
+          if (!targetMemberships?.length) {
             return new Response(
               JSON.stringify({ error: "Forbidden: Cannot send email using another user's credentials" }),
               { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -198,45 +220,6 @@ Deno.serve(async (req) => {
         }
       }
 
-      if (!settings) {
-        let { data: fallback } = await supabase
-          .from("email_settings")
-          .select("*")
-          .eq("config_type", configType)
-          .eq("is_active", true)
-          .limit(1)
-          .maybeSingle();
-
-        if (!fallback && configType !== "general") {
-          const { data: generalFallback } = await supabase
-            .from("email_settings")
-            .select("*")
-            .eq("config_type", "general")
-            .eq("is_active", true)
-            .limit(1)
-            .maybeSingle();
-          if (generalFallback) {
-            fallback = generalFallback;
-          }
-        }
-
-        if (!fallback) {
-          const { data: ultimateFallback } = await supabase
-            .from("email_settings")
-            .select("*")
-            .eq("is_active", true)
-            .limit(1)
-            .maybeSingle();
-          if (ultimateFallback) {
-            fallback = ultimateFallback;
-          }
-        }
-
-        if (fallback) {
-          settings = fallback;
-        }
-      }
-
       if (settings) {
         smtpHost = settings.smtp_host;
         smtpPort = settings.smtp_port;
@@ -270,7 +253,7 @@ Deno.serve(async (req) => {
               cleanPath = cleanPath.substring("resumes/".length);
             }
             try {
-              const { data, error } = await supabase.storage
+              const { data, error } = await (callerClient || supabase).storage
                 .from("resumes")
                 .createSignedUrl(cleanPath, 3600);
               

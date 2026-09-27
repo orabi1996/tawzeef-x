@@ -47,26 +47,11 @@ export function useAllAgencies() {
 
 export function useMyAgencies() {
   const { user } = useAuth();
-  const storedAgencyId = localStorage.getItem("active_agency_id");
-  const storedAgencyEmail = localStorage.getItem("agency_user_email");
 
   return useQuery({
-    queryKey: ["my-agencies", user?.id, storedAgencyId, storedAgencyEmail],
+    queryKey: ["my-agencies", user?.id],
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-      // 1) Direct Agency Session from LocalStorage
-      if (storedAgencyId) {
-        const { data: ag } = await supabase
-          .from("agencies" as any)
-          .select("*")
-          .eq("id", storedAgencyId)
-          .maybeSingle();
-        if (ag) {
-          return [{ ...ag, member_role: "owner" }] as (Agency & { member_role: string })[];
-        }
-      }
-
-      // 2) Query by Auth User ID in agency_members
       if (user?.id) {
         const { data, error } = await supabase
           .from("agency_members" as any)
@@ -78,21 +63,9 @@ export function useMyAgencies() {
         }
       }
 
-      // 3) Query by Email in agencies table
-      const targetEmail = storedAgencyEmail || user?.email;
-      if (targetEmail) {
-        const { data: byEmail } = await supabase
-          .from("agencies" as any)
-          .select("*")
-          .eq("contact_email", targetEmail.toLowerCase().trim());
-        if (byEmail && byEmail.length > 0) {
-          return byEmail.map((a: any) => ({ ...a, member_role: "owner" })) as (Agency & { member_role: string })[];
-        }
-      }
-
       return [];
     },
-    enabled: true,
+    enabled: !!user,
   });
 }
 

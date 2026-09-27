@@ -274,7 +274,12 @@ export default function Candidates() {
     if (!silent) toast({ title: "بدء الفرز الذكي", description: `جاري تقييم ${targets.length} مرشح تلقائياً...` });
     let successCount = 0;
     const { data: sessionData } = await supabase.auth.getSession();
-    const authToken = sessionData.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    const authToken = sessionData.session?.access_token;
+    if (!authToken) {
+      setAutoScreeningRunning(false);
+      toast({ title: "سجّل دخولك لتقييم المرشحين", variant: "destructive" });
+      return;
+    }
 
     for (const candidate of targets) {
       try {
@@ -1248,16 +1253,10 @@ export default function Candidates() {
                     onClick={async () => {
                       setAiSummaryLoading(true);
                       try {
-                        const resp = await fetch(EVAL_URL, {
-                          method: "POST",
-                          headers: {
-                            "Content-Type": "application/json",
-                            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
-                          },
-                          body: JSON.stringify({ candidateId: selectedCandidateForAiSummary.id, jobId: selectedCandidateForAiSummary.job_id }),
+                        const { data: evalResult, error } = await supabase.functions.invoke("evaluate-candidate", {
+                          body: { candidateId: selectedCandidateForAiSummary.id, jobId: selectedCandidateForAiSummary.job_id },
                         });
-                        if (!resp.ok) throw new Error("فشل التقييم");
-                        const evalResult = await resp.json();
+                        if (error || !evalResult || typeof evalResult.score !== "number") throw error || new Error("فشل التقييم");
                         setSelectedCandidateForAiSummary((prev: any) => ({
                           ...prev,
                           ai_score: evalResult.score,

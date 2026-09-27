@@ -31,8 +31,6 @@ interface AIEvaluationCardProps {
   candidate?: any;
 }
 
-const EVAL_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/evaluate-candidate`;
-
 const recommendationColors: Record<string, string> = {
   "مناسب جداً": "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
   "مناسب جداً (موصى به بلقطة ممتازة)": "bg-emerald-500/10 text-emerald-600 border-emerald-500/30",
@@ -75,55 +73,10 @@ export default function AIEvaluationCard(props: AIEvaluationCardProps) {
   const runEvaluation = async () => {
     setIsLoading(true);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const authToken = sessionData.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-      let data: AIEvaluation | null = null;
-      try {
-        const resp = await fetch(EVAL_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${authToken}`,
-          },
-          body: JSON.stringify({ candidateId, jobId }),
-        });
-
-        if (resp.ok) {
-          data = await resp.json();
-        }
-      } catch (fetchErr) {
-        console.warn("AI Evaluation fetch failed, using smart fallback:", fetchErr);
-      }
-
-      // If remote Edge Function returned error or failed, generate fallback evaluation
-      if (!data) {
-        const { data: cand } = await supabase.from("candidates").select("*").eq("id", candidateId).single();
-        const candidateSkills = cand?.skills || [];
-        const expScore = cand?.experience ? 12 : 5;
-        const score = Math.min(95, Math.max(62, 70 + expScore + (Array.isArray(candidateSkills) ? candidateSkills.length * 3 : 0)));
-
-        data = {
-          score,
-          skillsMatchScore: Math.min(95, score + 5),
-          experienceMatchScore: Math.min(90, score - 5),
-          educationMatchScore: 85,
-          culturalFitScore: 80,
-          summary: `تم فرز المرشح ${candidateName} بنجاح وحساب معدل التوافق مع متطلبات الوظيفة (${score}%).`,
-          strengths: cand?.experience ? [`خبرة عمل سابقة (${cand.experience})`, "مؤهلات ومهارات رئيسية متناسبة"] : ["مؤهل تعليمي ومهارات سيرة متوافقة مبدئياً"],
-          weaknesses: ["ينصح بإجراء مقابلة تقنية لتقييم عمق المهارات الميدانية"],
-          recommendation: score >= 80 ? "مناسب جداً (موصى به بلقطة ممتازة)" : "مناسب (موصى به للمقابلة)",
-          tailoredInterviewQuestions: [
-            `كيف تطبق خبراتك السابقة في إنجاز المهام التنافسية بمشروع التوظيف الحالي؟`,
-            `حدثنا عن تحدي فني واجهته وكيف تغلبت عليه بنجاح؟`
-          ]
-        };
-
-        await supabase.from("candidates").update({
-          ai_score: data.score,
-          ai_evaluation: JSON.stringify(data),
-        }).eq("id", candidateId);
-      }
+      const { data, error } = await supabase.functions.invoke<AIEvaluation>("evaluate-candidate", {
+        body: { candidateId, jobId },
+      });
+      if (error || !data || typeof data.score !== "number") throw error || new Error("تعذر التقييم، حاول لاحقاً");
 
       setEvaluation(data);
 
