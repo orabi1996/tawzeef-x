@@ -3,7 +3,7 @@ name: CI / Quality & Test Pipeline
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [ main, dev, 'fix/**' ]
   pull_request:
     branches: [ main ]
 
@@ -29,8 +29,14 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: TypeScript Check
-        run: npx tsc --noEmit
+      - name: Check Node tooling types
+        run: npx tsc -p tsconfig.node.json --noEmit
+
+      # The frontend has existing TypeScript errors. Report the real check
+      # without presenting the empty root tsconfig as a passing type check.
+      - name: Report frontend TypeScript errors
+        continue-on-error: true
+        run: npx tsc -p tsconfig.app.json --noEmit
 
       - name: Run Unit & Integration Tests
         run: npx vitest run

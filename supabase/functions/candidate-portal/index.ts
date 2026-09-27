@@ -1,272 +1,159 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getExtendedCorsHeaders } from "../_shared/cors.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const json = (body: unknown, status: number, headers: Record<string, string>) =>
+  new Response(JSON.stringify(body), { status, headers: { ...headers, "Content-Type": "application/json" } });
 
-serve(async (req) => {
+const escapeHtml = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, (c) => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+}[c]!));
+
+Deno.serve(async (req) => {
+  const corsHeaders = getExtendedCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405, corsHeaders);
 
   try {
-    const { trackingCode, email } = await req.json();
-    
-    if (!trackingCode && !email) {
-      return new Response(JSON.stringify({ error: "يرجى إدخال رمز التتبع أو البريد الإلكتروني" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const { trackingCode, email, action, credentials } = await req.json();
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, serviceKey);
+
+    if (action === "updateCredentials") {
+      const token = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "").trim();
+      const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!;
+      if (!token || token === anonKey || token === serviceKey || token === Deno.env.get("SUPABASE_PUBLISHABLE_KEY")) {
+        return json({ error: "سجّل دخولك بالبريد المسجل في طلبك أولاً." }, 401, corsHeaders);
+      }
+      const authClient = createClient(supabaseUrl, anonKey);
+      const { data: { user }, error: authError } = await authClient.auth.getUser(token);
+      if (authError || !user?.email) return json({ error: "Authentication required" }, 401, corsHeaders);
+      const code = typeof trackingCode === "string" ? trackingCode.trim().toUpperCase() : "";
+      if (!/^TX-[0-9A-F]{32}$/.test(code) || !credentials || typeof credentials !== "object") {
+        return json({ error: "Invalid credentials or tracking code" }, 400, corsHeaders);
+      }
+      const validEmail = user.email.toLowerCase();
+      const [{ data: ownCandidates, error: candidateError }, { data: ownApplications, error: applicationError }] = await Promise.all([
+        supabase.from("candidates").select("id").eq("tracking_code", code).ilike("email", validEmail).limit(2),
+        supabase.from("applications").select("id").eq("tracking_code", code).ilike("email", validEmail).limit(2),
+      ]);
+      if (candidateError || applicationError) throw candidateError || applicationError;
+      if (!ownCandidates?.length && !ownApplications?.length) return json({ error: "Forbidden" }, 403, corsHeaders);
+
+      const fields = {
+        license_number: String(credentials.licenseNumber || "").slice(0, 100),
+        license_expiry: credentials.licenseExpiry && /^\d{4}-\d{2}-\d{2}$/.test(credentials.licenseExpiry)
+          ? credentials.licenseExpiry : null,
+        university_degree: String(credentials.universityDegree || "").slice(0, 200),
+        demo_video_url: String(credentials.demoVideoUrl || "").slice(0, 1000),
+      };
+      for (const c of ownCandidates || []) {
+        const { error } = await supabase.from("candidates").update(fields).eq("id", c.id);
+        if (error) throw error;
+      }
+      for (const a of ownApplications || []) {
+        const { error } = await supabase.from("applications").update(fields).eq("id", a.id);
+        if (error) throw error;
+      }
+      // User-provided license details are saved, never marked as verified.
+      return json({ success: true }, 200, corsHeaders);
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    // --- Search by Email ---
-    if (email) {
+    if (typeof email === "string" && email.trim()) {
       const cleanEmail = email.trim().toLowerCase();
-      
-      const [{ data: candList }, { data: appList }] = await Promise.all([
-        supabase.from("candidates").select("id, name, role, tracking_code, job_id, email"),
-        supabase.from("applications").select("id, name, specialty, tracking_code, job_id, email")
-      ]);
+      if (cleanEmail.length > 254 || !/^[^\s@%_]+@[^\s@%_]+\.[^\s@%_]+$/.test(cleanEmail)) {
+        return json({ error: "Invalid email" }, 400, corsHeaders);
+      }
 
-      const matchedCands = (candList || []).filter(c => c.email && c.email.trim().toLowerCase() === cleanEmail);
-      const matchedApps = (appList || []).filter(a => a.email && a.email.trim().toLowerCase() === cleanEmail);
+      // Each mailbox has a server-side rate limit, even if the requester changes IP.
+      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(cleanEmail));
+      const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+      const { data: maySend, error: limitError } = await supabase.rpc("allow_candidate_recovery", { p_request_hash: hash });
+      if (limitError) throw limitError;
 
-      const allMatches = [
-        ...matchedCands.map(c => ({ name: c.name, tracking_code: c.tracking_code, job_id: c.job_id, role: c.role })),
-        ...matchedApps
-          .filter(a => !matchedCands.some(mc => mc.tracking_code === a.tracking_code))
-          .map(a => ({ name: a.name, tracking_code: a.tracking_code, job_id: a.job_id, role: a.specialty }))
-      ].filter(x => x.tracking_code);
+      if (maySend) {
+        const [{ data: candidates, error: candError }, { data: applications, error: appError }] = await Promise.all([
+          supabase.from("candidates").select("name, tracking_code, job_id, role").ilike("email", cleanEmail).limit(30),
+          supabase.from("applications").select("name, tracking_code, job_id, specialty").ilike("email", cleanEmail).limit(30),
+        ]);
+        if (candError || appError) throw candError || appError;
 
-      if (allMatches.length > 0) {
-        const jobIds = [...new Set(allMatches.filter(c => c.job_id).map(c => c.job_id))];
-        const jobsMap: Record<string, string> = {};
-        if (jobIds.length > 0) {
-          const { data: jobs } = await supabase.from("jobs").select("id, title").in("id", jobIds);
-          if (jobs) {
-            jobs.forEach(j => { jobsMap[j.id] = j.title; });
+        const byCode = new Map<string, { name: string; code: string; role: string }>();
+        for (const c of candidates || []) {
+          if (c.tracking_code) byCode.set(c.tracking_code, { name: c.name, code: c.tracking_code, role: c.role || "" });
+        }
+        for (const a of applications || []) {
+          if (a.tracking_code && !byCode.has(a.tracking_code)) {
+            byCode.set(a.tracking_code, { name: a.name, code: a.tracking_code, role: a.specialty || "" });
           }
         }
 
-        const siteUrl = req.headers.get("origin") || "https://tawzeefx.com";
-        const trackingList = allMatches.map(c => {
-          const jobTitle = c.job_id ? jobsMap[c.job_id] || c.role : c.role;
-          return `<li><strong>وظيفة ${jobTitle || "غير محددة"}:</strong> رمز التتبع هو <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-family:monospace;font-size:14px;">${c.tracking_code}</code> (<a href="${siteUrl}/candidate-portal?code=${c.tracking_code}" style="color:#0ea5e9;text-decoration:none;font-weight:bold;">اضغط هنا للمتابعة مباشرة</a>)</li>`;
-        }).join("\n");
-
-        const emailHtml = `
-          <div dir="rtl" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #e2e8f0; border-radius: 12px; background:#ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
-            <div style="background: linear-gradient(135deg, #0ea5e9, #0284c7); padding: 24px; border-radius: 8px 8px 0 0; text-align: center; margin:-30px -30px 24px -30px;">
-              <h2 style="color: #ffffff; margin: 0; font-size: 22px;">رموز تتبع طلبات التوظيف الخاصة بك 🔑</h2>
-            </div>
-            <p style="font-size:16px; color:#1e293b;">مرحباً <strong>${allMatches[0].name}</strong>،</p>
-            <p style="font-size:15px; color:#475569; line-height:1.6;">تلقينا طلباً لاسترجاع رموز تتبع طلبات التوظيف الخاصة بك على منصة <strong>Tawzeef-X</strong>. إليك رموز التتبع الخاصة بك للوصول لبوابة المتابعة:</p>
-            <ul style="line-height: 2; font-size:15px; color:#334155; padding-right: 20px; background:#f8fafc; padding:16px; border-radius:8px; list-style-type:none;">
-              ${trackingList}
-            </ul>
-            <p style="font-size:14px; color:#64748b; margin-top:24px;">إذا لم تكن قد طلبت استرجاع هذه الرموز، يمكنك تجاهل هذا البريد الإلكتروني بأمان.</p>
-            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
-            <p style="font-size: 11px; color: #94a3b8; text-align: center; margin:0;">هذا البريد الإلكتروني مرسل تلقائياً من نظام Tawzeef-X للتوظيف الذكي.</p>
-          </div>
-        `;
-
-        await fetch(`${supabaseUrl}/functions/v1/send-email`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${supabaseKey}`,
-          },
-          body: JSON.stringify({
-            to: cleanEmail,
-            subject: "رموز تتبع طلبات التوظيف الخاصة بك — Tawzeef-X",
-            html: emailHtml,
-          }),
-        }).catch(err => console.error("Failed sending email:", err));
+        if (byCode.size) {
+          // Do not trust the request's Origin when building links in an email.
+          const siteUrl = (Deno.env.get("APP_URL") || "https://www.tawzeefx.com").replace(/\/$/, "");
+          const rows = [...byCode.values()].map((c) =>
+            `<li>${escapeHtml(c.role)}: <code>${escapeHtml(c.code)}</code> ` +
+            `<a href="${escapeHtml(siteUrl)}/portal?code=${encodeURIComponent(c.code)}">متابعة الطلب</a></li>`
+          ).join("");
+          const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+            body: JSON.stringify({
+              to: cleanEmail,
+              subject: "رموز تتبع طلبات التوظيف الخاصة بك — Tawzeef-X",
+              html: `<div dir="rtl"><p>مرحباً ${escapeHtml(byCode.values().next().value?.name)}</p><p>رموز متابعة طلباتك:</p><ul>${rows}</ul></div>`,
+            }),
+          });
+          if (!response.ok) console.error("Candidate recovery email failed:", response.status);
+        }
       }
-
-      return new Response(JSON.stringify({
-        success: true,
-        message: "إذا كان البريد الإلكتروني مسجلاً لدينا، فقد أرسلنا إليك رسالة بريد إلكتروني تحتوي على رموز التتبع وتفاصيل المتابعة.",
-        candidates: []
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      // Always give the same response whether the email exists or was rate limited.
+      return json({ success: true, message: "إذا كان البريد مسجلاً، ستصلك رسالة تحتوي على رموز التتبع.", candidates: [] }, 200, corsHeaders);
     }
 
-    // --- Search by Tracking Code ---
-    const rawCode = trackingCode.trim();
-    const digitsOnly = rawCode.replace(/[^0-9]/g, "");
-    const formattedTxCode = digitsOnly ? `TX-${digitsOnly}` : rawCode;
+    if (typeof trackingCode !== "string") return json({ error: "Tracking code required" }, 400, corsHeaders);
+    const code = trackingCode.trim().toUpperCase();
+    // Codes were rotated to 128-bit random values in the accompanying migration.
+    if (!/^TX-[0-9A-F]{32}$/.test(code)) {
+      return json({ error: "رمز تتبع غير صالح. يمكنك استرجاع الرمز الجديد عبر البريد الإلكتروني." }, 400, corsHeaders);
+    }
 
-    // Fetch all candidates and applications using service role client (bypassing RLS)
-    const [{ data: allCands, error: candErr }, { data: allApps, error: appErr }] = await Promise.all([
-      supabase.from("candidates").select("id, name, role, stage, status, skills, created_at, tracking_code, job_id, email, phone"),
-      supabase.from("applications").select("id, name, specialty, status, skills, created_at, tracking_code, job_id, email, phone")
+    // Exact indexed lookup only: never load whole tables or match names, phones or partial IDs.
+    const [{ data: candidates, error: candError }, { data: applications, error: appError }] = await Promise.all([
+      supabase.from("candidates").select("id, name, role, stage, status, skills, created_at, tracking_code, job_id, license_number, license_expiry, university_degree, demo_video_url")
+        .eq("tracking_code", code).limit(2),
+      supabase.from("applications").select("id, name, specialty, status, skills, created_at, tracking_code, job_id, license_number, license_expiry, university_degree, demo_video_url")
+        .eq("tracking_code", code).limit(2),
     ]);
+    if (candError || appError) throw candError || appError;
 
-    if (candErr) console.error("DB error candidates search:", candErr);
-    if (appErr) console.error("DB error applications search:", appErr);
-
-    // Multi-strategy matching on candidates
-    const matchedCands = (allCands || []).filter(c => {
-      const tc = (c.tracking_code || "").trim();
-      const idStr = (c.id || "").trim();
-      const emailStr = (c.email || "").trim().toLowerCase();
-      const phoneStr = (c.phone || "").trim();
-
-      // 1. Exact or formatted match
-      if (tc && (tc.toLowerCase() === rawCode.toLowerCase() || tc.toLowerCase() === formattedTxCode.toLowerCase())) return true;
-      if (idStr && idStr.toLowerCase() === rawCode.toLowerCase()) return true;
-
-      // 2. Digit match if digitsOnly is provided
-      if (digitsOnly && digitsOnly.length >= 3) {
-        if (tc && tc.includes(digitsOnly)) return true;
-        if (idStr && idStr.toLowerCase().includes(digitsOnly.toLowerCase())) return true;
-        if (phoneStr && phoneStr.includes(digitsOnly)) return true;
-      }
-
-      // 3. Email match
-      if (emailStr && rawCode.toLowerCase() === emailStr) return true;
-
-      return false;
-    });
-
-    // Multi-strategy matching on applications
-    const matchedApps = (allApps || []).filter(a => {
-      const tc = (a.tracking_code || "").trim();
-      const idStr = (a.id || "").trim();
-      const emailStr = (a.email || "").trim().toLowerCase();
-      const phoneStr = (a.phone || "").trim();
-
-      if (tc && (tc.toLowerCase() === rawCode.toLowerCase() || tc.toLowerCase() === formattedTxCode.toLowerCase())) return true;
-      if (idStr && idStr.toLowerCase() === rawCode.toLowerCase()) return true;
-
-      if (digitsOnly && digitsOnly.length >= 3) {
-        if (tc && tc.includes(digitsOnly)) return true;
-        if (idStr && idStr.toLowerCase().includes(digitsOnly.toLowerCase())) return true;
-        if (phoneStr && phoneStr.includes(digitsOnly)) return true;
-      }
-
-      if (emailStr && rawCode.toLowerCase() === emailStr) return true;
-
-      return false;
-    });
-
-    // Auto-heal tracking code in DB for any matched record that had NULL tracking_code
-    for (const c of matchedCands) {
-      if (!c.tracking_code) {
-        await supabase.from("candidates").update({ tracking_code: formattedTxCode }).eq("id", c.id).catch(e => console.warn("Failed auto-healing candidate tracking_code:", e));
-        c.tracking_code = formattedTxCode;
-      }
-    }
-    for (const a of matchedApps) {
-      if (!a.tracking_code) {
-        await supabase.from("applications").update({ tracking_code: formattedTxCode }).eq("id", a.id).catch(e => console.warn("Failed auto-healing application tracking_code:", e));
-        a.tracking_code = formattedTxCode;
-      }
-    }
-
-    const mergedList = [
-      ...matchedCands.map(c => ({
-        id: c.id,
-        name: c.name,
-        role: c.role || "متقدم للوظيفة",
-        stage: c.stage || "تقديم الطلب",
-        status: c.status || "قيد المراجعة",
-        skills: c.skills,
-        trackingCode: c.tracking_code || formattedTxCode || c.id?.slice(0, 8).toUpperCase(),
-        appliedAt: c.created_at,
-        jobId: c.job_id
+    const matches = [
+      ...(candidates || []).map((c) => ({
+        id: c.id, name: c.name, role: c.role || "متقدم للوظيفة", stage: c.stage || "تقديم الطلب",
+        status: c.status || "قيد المراجعة", skills: c.skills, trackingCode: c.tracking_code,
+        appliedAt: c.created_at, jobId: c.job_id, licenseNumber: c.license_number,
+        licenseExpiry: c.license_expiry, universityDegree: c.university_degree, demoVideoUrl: c.demo_video_url,
       })),
-      ...matchedApps
-        .filter(a => !matchedCands.some(c => 
-          c.id === a.id || 
-          (c.tracking_code && a.tracking_code && c.tracking_code.toLowerCase() === a.tracking_code.toLowerCase()) ||
-          (c.email && a.email && c.email.toLowerCase() === a.email.toLowerCase() && c.job_id === a.job_id)
-        ))
-        .map(a => {
-          const linkedCand = (allCands || []).find(c => 
-            c.id === a.id || 
-            (c.email && a.email && c.email.toLowerCase() === a.email.toLowerCase() && c.job_id === a.job_id)
-          );
-          const resolvedStage = linkedCand?.stage || (a.status === "مقبول" ? "العرض الوظيفي" : "تقديم الطلب");
-          const resolvedStatus = linkedCand?.status || a.status || "قيد المراجعة";
-
-          // Auto-seed into candidates if missing so future updates have a record
-          if (!linkedCand) {
-            supabase.from("candidates").upsert({
-              id: a.id,
-              name: a.name,
-              email: a.email,
-              phone: a.phone,
-              job_id: a.job_id,
-              role: a.specialty || "متقدم جديد",
-              stage: resolvedStage,
-              status: resolvedStatus,
-              tracking_code: a.tracking_code || formattedTxCode,
-              skills: a.skills,
-              source: "رابط التقديم المباشر"
-            }, { onConflict: "id", ignoreDuplicates: true }).catch((e: any) => console.warn("Auto-seed cand notice:", e));
-          }
-
-          return {
-            id: a.id,
-            name: a.name,
-            role: a.specialty || "متقدم للوظيفة",
-            stage: resolvedStage,
-            status: resolvedStatus,
-            skills: a.skills,
-            trackingCode: a.tracking_code || formattedTxCode || a.id?.slice(0, 8).toUpperCase(),
-            appliedAt: a.created_at,
-            jobId: a.job_id
-          };
-        })
+      ...(applications || []).filter((a) => !(candidates || []).some((c) =>
+        c.id === a.id || (c.tracking_code && c.tracking_code === a.tracking_code)
+      )).map((a) => ({
+        id: a.id, name: a.name, role: a.specialty || "متقدم للوظيفة", stage: "تقديم الطلب",
+        status: a.status || "قيد المراجعة", skills: a.skills, trackingCode: a.tracking_code,
+        appliedAt: a.created_at, jobId: a.job_id, licenseNumber: a.license_number,
+        licenseExpiry: a.license_expiry, universityDegree: a.university_degree, demoVideoUrl: a.demo_video_url,
+      })),
     ];
+    if (!matches.length) return json({ error: "لم يتم العثور على طلب بهذا الرمز." }, 404, corsHeaders);
 
-    if (mergedList.length === 0) {
-      return new Response(JSON.stringify({ error: "لم يتم العثور على طلبات. تأكد من رمز التتبع وحاول مرة أخرى." }), {
-        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Fetch job titles for matched items
-    const jobIds = [...new Set(mergedList.filter(c => c.jobId).map(c => c.jobId))];
-    const jobsMap: Record<string, string> = {};
-    
-    if (jobIds.length > 0) {
-      const { data: jobs } = await supabase
-        .from("jobs")
-        .select("id, title")
-        .in("id", jobIds);
-      
-      if (jobs) {
-        jobs.forEach(j => { jobsMap[j.id] = j.title; });
-      }
-    }
-
-    const result = mergedList.map(c => ({
-      id: c.id,
-      name: c.name,
-      role: c.role,
-      stage: c.stage,
-      status: c.status,
-      skills: c.skills,
-      trackingCode: c.trackingCode,
-      appliedAt: c.appliedAt,
-      jobTitle: c.jobId ? jobsMap[c.jobId] || c.role : c.role,
-      aiScore: null,
-    }));
-
-    return new Response(JSON.stringify({ candidates: result }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (e) {
-    console.error("candidate-portal error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    const jobIds = [...new Set(matches.map((c) => c.jobId).filter(Boolean))];
+    const { data: jobs, error: jobsError } = jobIds.length
+      ? await supabase.from("jobs").select("id, title").in("id", jobIds)
+      : { data: [], error: null };
+    if (jobsError) throw jobsError;
+    const titles = new Map((jobs || []).map((j) => [j.id, j.title]));
+    return json({ candidates: matches.map(({ jobId, ...c }) => ({ ...c, jobTitle: titles.get(jobId) || c.role, aiScore: null })) }, 200, corsHeaders);
+  } catch (error) {
+    console.error("candidate-portal:", error);
+    return json({ error: "Unable to load the application" }, 500, corsHeaders);
   }
 });

@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { Link, useSearchParams } from "react-router-dom";
 import CandidateChatbot from "@/components/candidate-portal/CandidateChatbot";
 import { supabase } from "@/integrations/supabase/client";
+import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { SEO } from "@/components/marketing/SEO";
@@ -160,7 +161,7 @@ export default function CandidatePortal() {
     let foundCandidates: CandidateResult[] = [];
     const cleanInput = queryInput.trim();
 
-    // Call the candidate-portal edge function with service_role privileges
+    // The public function validates the full tracking code server-side.
     try {
       const payload = queryType === "tracking"
         ? { trackingCode: cleanInput }
@@ -193,83 +194,6 @@ export default function CandidatePortal() {
       console.warn("Edge function fetch error, falling back to client query:", edgeErr);
     }
 
-    // Direct DB query fallback (helpful if user is authenticated or edge function was unreachable)
-    if (foundCandidates.length === 0 && !emailSent) {
-      try {
-        let candQuery = supabase.from("candidates").select("*, jobs(title)");
-        let appQuery = supabase.from("applications").select("*, jobs(title)");
-
-        if (queryType === "tracking") {
-          const codeDigits = cleanInput.replace(/[^a-zA-Z0-9]/g, "");
-          if (codeDigits.length >= 4) {
-            const txFormatted = codeDigits.toLowerCase().startsWith("tx") ? codeDigits : `TX-${codeDigits}`;
-            candQuery = (candQuery as any).or(
-              `tracking_code.ilike.${cleanInput},tracking_code.ilike.${txFormatted},tracking_code.ilike.%${codeDigits}%,id.ilike.%${codeDigits}%`
-            );
-            appQuery = (appQuery as any).or(
-              `tracking_code.ilike.${cleanInput},tracking_code.ilike.${txFormatted},tracking_code.ilike.%${codeDigits}%,id.ilike.%${codeDigits}%`
-            );
-          } else {
-            candQuery = candQuery.ilike("tracking_code", `%${cleanInput}%`);
-            appQuery = appQuery.ilike("tracking_code", `%${cleanInput}%`);
-          }
-        } else {
-          candQuery = candQuery.ilike("email", cleanInput);
-          appQuery = appQuery.ilike("email", cleanInput);
-        }
-
-        const [{ data: candsData }, { data: appsData }] = await Promise.all([candQuery, appQuery]);
-
-        const mappedCands: CandidateResult[] = (candsData || []).map((c: any) => ({
-          id: c.id,
-          name: c.name,
-          role: c.role || c.jobs?.title || "متقدم للوظيفة",
-          stage: c.stage || "تقديم الطلب",
-          status: c.status || "جديد",
-          skills: c.skills || null,
-          trackingCode: c.tracking_code || c.id?.slice(0, 8).toUpperCase(),
-          appliedAt: c.created_at,
-          jobTitle: c.jobs?.title || c.role || null,
-          aiScore: null,
-          licenseNumber: c.license_number || null,
-          licenseExpiry: c.license_expiry || null,
-          universityDegree: c.university_degree || null,
-          demoVideoUrl: c.demo_video_url || "",
-        }));
-
-        const mappedApps: CandidateResult[] = (appsData || [])
-          .filter(a => !mappedCands.some(mc => mc.id === a.id || (a.tracking_code && mc.trackingCode.toLowerCase() === a.tracking_code.toLowerCase())))
-          .map((a: any) => {
-            const correspondingCand = (candsData || []).find((c: any) => c.id === a.id || (c.email && a.email && c.email.toLowerCase() === a.email.toLowerCase() && c.job_id === a.job_id));
-            const resolvedStage = correspondingCand?.stage || (a.status === "مقبول" ? "العرض الوظيفي" : "تقديم الطلب");
-            const resolvedStatus = correspondingCand?.status || a.status || "قيد المراجعة";
-            return {
-              id: a.id,
-              name: a.name,
-              role: a.specialty || a.jobs?.title || "متقدم للوظيفة",
-              stage: resolvedStage,
-              status: resolvedStatus,
-              skills: a.skills || null,
-              trackingCode: a.tracking_code || a.id?.slice(0, 8).toUpperCase(),
-              appliedAt: a.created_at,
-              jobTitle: a.jobs?.title || a.specialty || null,
-              aiScore: null,
-              licenseNumber: a.license_number || null,
-              licenseExpiry: a.license_expiry || null,
-              universityDegree: a.university_degree || null,
-              demoVideoUrl: a.demo_video_url || "",
-            };
-          });
-
-        const dbResults = [...mappedCands, ...mappedApps];
-        if (dbResults.length > 0) {
-          foundCandidates = dbResults;
-        }
-      } catch (dbErr) {
-        console.error("Direct candidate database query exception:", dbErr);
-      }
-    }
-
     if (foundCandidates.length > 0) {
       setCandidates(foundCandidates);
     } else {
@@ -286,24 +210,26 @@ export default function CandidatePortal() {
   const handleSaveTeacherCredentials = async () => {
     if (!editTeacherModal) return;
     try {
-      const { error } = await supabase.from("candidates" as any).update({
-        license_number: licenseNumberInput,
-        license_expiry: licenseExpiryInput,
-        university_degree: degreeInput,
-        demo_video_url: demoVideoInput,
-        license_status: "valid"
-      } as any).eq("id", editTeacherModal.id);
-
-      if (error) {
-        await supabase.from("applications" as any).update({
-          license_number: licenseNumberInput,
-          license_expiry: licenseExpiryInput,
-          university_degree: degreeInput,
-          demo_video_url: demoVideoInput,
-        } as any).eq("id", editTeacherModal.id);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({ title: "سجّل دخولك بنفس بريد الطلب لتعديل بياناتك", variant: "destructive" });
+        return;
       }
+      const { data, error } = await supabase.functions.invoke("candidate-portal", {
+        body: {
+          action: "updateCredentials",
+          trackingCode: editTeacherModal.trackingCode,
+          credentials: {
+            licenseNumber: licenseNumberInput,
+            licenseExpiry: licenseExpiryInput,
+            universityDegree: degreeInput,
+            demoVideoUrl: demoVideoInput,
+          },
+        },
+      });
+      if (error || !data?.success) throw error || new Error(data?.error || "تعذر حفظ البيانات");
 
-      toast({ title: "تم تويثق وتحديث بيانات الرخصة المهنية والمؤهلات بنجاح 🇸🇦✅" });
+      toast({ title: "تم حفظ بيانات الرخصة والمؤهلات، والتحقق منها يتم بشكل منفصل ✅" });
       setEditTeacherModal(null);
       performSearch(input, searchType);
     } catch (e: any) {
@@ -410,9 +336,6 @@ export default function CandidatePortal() {
                   <div>
                     <div className="flex items-center gap-2">
                       <h2 className="text-lg font-bold text-foreground">{c.name}</h2>
-                      <Badge className="bg-emerald-600 text-white text-[10px] gap-1">
-                        <CheckCircle2 className="w-3 h-3" /> ملف موثق 🇸🇦
-                      </Badge>
                     </div>
                     {c.role && <p className="text-xs text-muted-foreground mt-0.5">{c.role}</p>}
                   </div>
@@ -432,8 +355,8 @@ export default function CandidatePortal() {
                         <Shield className="w-3.5 h-3.5" />
                         الرخصة المهنية للمعلمين بالسعودية:
                       </span>
-                      <p className="text-xs font-bold text-foreground">{c.licenseNumber || "ETEC-9842145-SA"} (سارية)</p>
-                      <p className="text-[10px] text-muted-foreground">المؤهل: {c.universityDegree || "بكالوريوس علوم وتربية"}</p>
+                      <p className="text-xs font-bold text-foreground">{c.licenseNumber || "لم تُدخل بيانات الرخصة بعد"}</p>
+                      <p className="text-[10px] text-muted-foreground">المؤهل: {c.universityDegree || "غير مسجل"}</p>
                     </div>
                     <Button
                       size="sm"
@@ -441,10 +364,10 @@ export default function CandidatePortal() {
                       className="rounded-xl text-xs gap-1.5 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10"
                       onClick={() => {
                         setEditTeacherModal(c);
-                        setLicenseNumberInput(c.licenseNumber || "ETEC-9842145-SA");
-                        setLicenseExpiryInput(c.licenseExpiry || "2028-12-30");
-                        setDegreeInput(c.universityDegree || "بكالوريوس علوم وتربية");
-                        setDemoVideoInput(c.demo_video_url || "");
+                        setLicenseNumberInput(c.licenseNumber || "");
+                        setLicenseExpiryInput(c.licenseExpiry || "");
+                        setDegreeInput(c.universityDegree || "");
+                        setDemoVideoInput(c.demoVideoUrl || "");
                       }}
                     >
                       <Award className="w-3.5 h-3.5" />
@@ -464,7 +387,7 @@ export default function CandidatePortal() {
           <DialogHeader className="text-right">
             <DialogTitle className="text-base font-bold flex items-center gap-2">
               <Shield className="w-4 h-4 text-emerald-600" />
-              توثيق الرخصة المهنية وإكمال بيانات المعلم
+              إضافة بيانات الرخصة المهنية وإكمال ملف المعلم
             </DialogTitle>
             <DialogDescription className="text-xs">
               أدخل رقم الرخصة المهنية الصادرة من هيئة تقويم التعليم والتدريب (etec.gov.sa) ورابط فيديو الدرس التجريبي لتعزيز قبولك بالمدارس.
@@ -517,7 +440,7 @@ export default function CandidatePortal() {
 
             <Button onClick={handleSaveTeacherCredentials} className="w-full h-10 text-xs font-bold rounded-xl bg-emerald-600 text-white hover:bg-emerald-500">
               <Check className="w-4 h-4" />
-              تأكيد وتوثيق ملف المعلم المعتمد 🇸🇦
+              حفظ بيانات الرخصة والمؤهلات
             </Button>
           </div>
         </DialogContent>

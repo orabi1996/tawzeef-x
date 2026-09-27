@@ -2396,6 +2396,7 @@ export type Database = {
         }
         Returns: Json
       }
+      validate_tenant_status: { Args: { _company_id?: string }; Returns: Json }
     }
     Enums: {
       app_role:

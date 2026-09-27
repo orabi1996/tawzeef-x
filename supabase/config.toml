@@ -86,3 +86,9 @@ verify_jwt = false
 
 [functions.delete-company]
 verify_jwt = true
+
+[functions.manage-agency-account]
+verify_jwt = true
+
+[functions.submit-agency-candidate]
+verify_jwt = true

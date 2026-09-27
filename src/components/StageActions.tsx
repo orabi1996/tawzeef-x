@@ -893,10 +893,10 @@ export default function StageActions(props: StageActionsProps) {
 
       // 7. Trigger email notification via notify-stage-change
       const { data: sessionData } = await supabase.auth.getSession();
-      const authToken = sessionData.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const authToken = sessionData.session?.access_token;
 
       try {
-        fetch(
+        if (authToken) await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/notify-stage-change`,
           {
             method: "POST",
@@ -1007,10 +1007,10 @@ export default function StageActions(props: StageActionsProps) {
       }
 
       const { data: sessionData } = await supabase.auth.getSession();
-      const authToken = sessionData.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const authToken = sessionData.session?.access_token;
 
       try {
-        fetch(
+        if (authToken) await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/notify-stage-change`,
           {
             method: "POST",

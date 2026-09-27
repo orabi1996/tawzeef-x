@@ -166,97 +166,103 @@ Deno.serve(async (req) => {
   try {
     const { candidateId, newStage, action, rejectionReason } = await req.json();
 
+    if (typeof candidateId !== "string" || !/^[0-9a-f-]{36}$/i.test(candidateId) ||
+        !["approve", "reject"].includes(action) ||
+        (action === "approve" && (typeof newStage !== "string" || !newStage.trim()))) {
+      return new Response(JSON.stringify({ error: "Invalid candidate or stage change" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!;
 
-    // Auth check
     const authHeader = req.headers.get("Authorization") || "";
     const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-
-    let callerId: string | null = null;
-    if (token && token !== anonKey && token !== Deno.env.get("SUPABASE_PUBLISHABLE_KEY")) {
-      try {
-        const authClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: `Bearer ${token}` } } });
-        const { data: userData } = await authClient.auth.getUser();
-        if (userData?.user) {
-          callerId = userData.user.id;
-        }
-      } catch (e) {
-        console.warn("User auth verification warning in notify-stage-change:", e);
-      }
+    if (!token || token === anonKey || token === Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || token === serviceKey) {
+      return new Response(JSON.stringify({ error: "Authentication required" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
+
+    const authClient = createClient(supabaseUrl, anonKey);
+    const { data: { user }, error: authError } = await authClient.auth.getUser(token);
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: "Authentication required" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const callerId = user.id;
 
     const supabase = createClient(supabaseUrl, serviceKey);
 
     let candidate: any = null;
-    const { data: candData } = await supabase
+    let application: any = null;
+    const { data: candData, error: candidateError } = await supabase
       .from("candidates")
       .select("*, jobs(title, user_id)")
       .eq("id", candidateId)
       .maybeSingle();
 
+    if (candidateError) throw candidateError;
+
     if (candData) {
       candidate = candData;
     } else {
       // Look up in applications table
-      const { data: appData } = await supabase
+      const { data: appData, error: applicationError } = await supabase
         .from("applications")
-        .select("*, jobs(title, user_id)")
+        .select("*, jobs(title, user_id, company_id)")
         .eq("id", candidateId)
         .maybeSingle();
-
-      if (appData) {
-        // Auto-seed into candidates table using service role key
-        const { data: createdCand } = await supabase
-          .from("candidates")
-          .upsert({
-            id: appData.id,
-            user_id: appData.jobs?.user_id || callerId || null,
-            company_id: appData.company_id || null,
-            job_id: appData.job_id,
-            name: appData.name,
-            email: appData.email,
-            phone: appData.phone,
-            role: appData.jobs?.title || appData.specialty || "مرشح",
-            stage: newStage || "تقديم الطلب",
-            status: newStage === "العرض الوظيفي" ? "مقبول" : "قيد المراجعة",
-            tracking_code: appData.tracking_code || null,
-            experience: appData.experience || null,
-            resume_url: appData.resume_url || null,
-            skills: appData.skills || null,
-            summary: appData.cover_letter || null,
-            source: "رابط التقديم المباشر",
-          }, { onConflict: "id" })
-          .select("*, jobs(title, user_id)")
-          .maybeSingle();
-
-        candidate = createdCand;
-      }
+      if (applicationError) throw applicationError;
+      application = appData;
     }
 
-    if (!candidate) {
+    if (!candidate && !application) {
       return new Response(JSON.stringify({ error: "Candidate not found" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Permission check if caller user is identified
-    if (callerId) {
-      const isOwner = candidate.user_id === callerId;
-      const { data: roleData } = await supabase.from("user_roles").select("role").eq("user_id", callerId).eq("role", "admin").maybeSingle();
-      const isAdmin = !!roleData;
-      let hasCompanyAccess = false;
-      if (candidate.company_id) {
-        const { data: memberData } = await supabase.from("company_members").select("company_id").eq("company_id", candidate.company_id).eq("user_id", callerId).maybeSingle();
-        hasCompanyAccess = !!memberData;
-      }
-      if (!(isOwner || isAdmin || hasCompanyAccess)) {
-        return new Response(JSON.stringify({ error: "Forbidden: You do not have permission to modify this candidate" }), {
-          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+    const companyId = candidate?.company_id || application?.company_id || application?.jobs?.company_id;
+    const [{ data: platformRole, error: roleError }, { data: membership, error: memberError }] = await Promise.all([
+      supabase.from("platform_roles").select("role").eq("user_id", callerId).eq("role", "super_admin").maybeSingle(),
+      companyId
+        ? supabase.from("company_members").select("company_id").eq("company_id", companyId).eq("user_id", callerId).maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+    if (roleError || memberError) throw roleError || memberError;
+    if (!platformRole && !membership && !(candidate && !companyId && candidate.user_id === callerId)) {
+      return new Response(JSON.stringify({ error: "Forbidden: candidate belongs to another company" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Only an authorized recruiter can create a candidate from an application.
+    if (application) {
+      const { data: createdCand, error: createError } = await supabase.from("candidates").upsert({
+        id: application.id,
+        user_id: application.jobs?.user_id || callerId,
+        company_id: companyId || null,
+        job_id: application.job_id,
+        name: application.name,
+        email: application.email,
+        phone: application.phone,
+        role: application.jobs?.title || application.specialty || "مرشح",
+        stage: "تقديم الطلب",
+        status: "قيد المراجعة",
+        tracking_code: application.tracking_code || null,
+        experience: application.experience || null,
+        resume_url: application.resume_url || null,
+        skills: application.skills || null,
+        summary: application.cover_letter || null,
+        source: "رابط التقديم المباشر",
+      }, { onConflict: "id", ignoreDuplicates: true }).select("*, jobs(title, user_id)").single();
+      if (createError) throw createError;
+      candidate = createdCand;
     }
 
     const oldStage = candidate.stage;

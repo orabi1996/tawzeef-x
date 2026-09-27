@@ -460,21 +460,11 @@ export default function Pipeline() {
       const shouldNotify = automationRules.notify_candidate_email !== false;
 
       if (candidate.email && shouldNotify) {
-        fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/notify-stage-change`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-            },
-            body: JSON.stringify({
-              candidateId,
-              newStage: toStage,
-              action: "approve",
-            }),
-          }
-        ).catch(console.error);
+        supabase.functions.invoke("notify-stage-change", {
+          body: { candidateId, newStage: toStage, action: "approve" },
+        }).then(({ error }) => {
+          if (error) console.error("Failed to notify candidate:", error);
+        });
       }
 
       // 1. Auto-run AI Evaluation if configured and not evaluated yet

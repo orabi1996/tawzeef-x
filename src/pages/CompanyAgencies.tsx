@@ -28,7 +28,7 @@ export default function CompanyAgencies() {
   const [selectedAgencyForEdit, setSelectedAgencyForEdit] = useState<any | null>(null);
   const [selectedAgencyForDelete, setSelectedAgencyForDelete] = useState<any | null>(null);
 
-  const [createdCredentials, setCreatedCredentials] = useState<{ email: string; pass: string; name: string } | null>(null);
+  const [createdCredentials, setCreatedCredentials] = useState<{ email: string; name: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -37,7 +37,6 @@ export default function CompanyAgencies() {
     name: "",
     contactPerson: "",
     email: "",
-    password: "",
     phone: "",
     country: "المملكة العربية السعودية",
     city: "الرياض",
@@ -51,7 +50,6 @@ export default function CompanyAgencies() {
     name: "",
     contactPerson: "",
     email: "",
-    password: "",
     phone: "",
     country: "",
     city: "",
@@ -111,105 +109,33 @@ export default function CompanyAgencies() {
 
   const agencies = agenciesQuery.data || [];
 
-  // Submit Handler: Add New Agency & Create Login Credentials
+  // Create an agency through the authenticated, company-scoped server function.
   const handleAddAgency = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.email || !form.password) {
+    if (!form.name || !form.email || !companyId) {
       toast({ title: "يرجى تعبئة كافة الحقول الأساسية", variant: "destructive" });
       return;
     }
 
     setIsSubmitting(true);
     try {
-      let targetCompanyId = companyId;
-      if (!targetCompanyId && user) {
-        const { data: myComp } = await supabase.from("companies").select("id").limit(1).maybeSingle();
-        if (myComp) {
-          targetCompanyId = myComp.id;
-        } else {
-          const { data: newComp } = await supabase.from("companies").insert({
-            name: "مؤسسة التوظيف الرئيسية",
-            contact_email: user.email,
-            owner_user_id: user.id
-          }).select("id").single();
-          targetCompanyId = newComp?.id || null;
-        }
-      }
-
-      const formattedNotes = form.notes 
-        ? `${form.notes}\n[PASS:${form.password}]` 
-        : `[PASS:${form.password}]`;
-
-      // 1. Insert Agency Record
-      const { data: newAgency, error: agencyErr } = await supabase
-        .from("agencies" as any)
-        .insert({
-          name: form.name,
-          contact_email: form.email.trim().toLowerCase(),
-          contact_phone: form.phone,
-          country: form.country,
-          city: form.city,
-          license_number: form.licenseNumber,
-          notes: formattedNotes,
-          owner_user_id: user?.id || null,
-          status: "active"
-        } as any)
-        .select()
-        .single();
-
-      if (agencyErr) throw agencyErr;
-      const agencyId = (newAgency as any).id;
-
-      // 2. Link Agency to Company in agency_assignments
-      if (targetCompanyId) {
-        await supabase
-          .from("agency_assignments" as any)
-          .insert({
-            agency_id: agencyId,
-            company_id: targetCompanyId,
-            scope: "company",
-            status: "active"
-          } as any);
-      }
-
-      // 3. Register Auth User via non-persisting client so Company Owner stays logged in
-      try {
-        const tempAuthClient = (await import("@supabase/supabase-js")).createClient(
-          import.meta.env.VITE_SUPABASE_URL,
-          import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          { auth: { persistSession: false } }
-        );
-
-        await tempAuthClient.auth.signUp({
-          email: form.email.trim().toLowerCase(),
-          password: form.password,
-          options: {
-            data: {
-              full_name: form.contactPerson || form.name,
-              role: "recruiter",
-              user_type: "agency",
-              agency_id: agencyId
-            }
-          }
-        });
-      } catch (signUpErr) {
-        console.warn("Temp client signUp warning:", signUpErr);
-      }
+      const { data, error } = await supabase.functions.invoke("manage-agency-account", {
+        body: { action: "create", companyId, ...form },
+      });
+      if (error || !data?.success) throw error || new Error(data?.error || "فشل إرسال الدعوة");
 
       setCreatedCredentials({
         email: form.email.trim().toLowerCase(),
-        pass: form.password,
         name: form.name
       });
 
       qc.invalidateQueries({ queryKey: ["company-agencies"] });
-      toast({ title: "تم إضافة مكتب التوظيف وإنشاء حساب الدخول بنجاح! 🎉" });
+      toast({ title: "تمت إضافة المكتب وإرسال دعوة الدخول عبر البريد ✅" });
       setOpenAddDialog(false);
       setForm({
         name: "",
         contactPerson: "",
         email: "",
-        password: "",
         phone: "",
         country: "المملكة العربية السعودية",
         city: "الرياض",
@@ -231,13 +157,12 @@ export default function CompanyAgencies() {
       name: agency.name || "",
       contactPerson: agency.contact_person || agency.name || "",
       email: agency.contact_email || "",
-      password: "",
       phone: agency.contact_phone || "",
       country: agency.country || "المملكة العربية السعودية",
       city: agency.city || "الرياض",
       licenseNumber: agency.license_number || "",
       status: agency.status || "active",
-      notes: agency.notes || ""
+      notes: (agency.notes || "").replace(/\[PASS:[^\]]*\]/gi, "").trim()
     });
     setOpenEditDialog(true);
   };
@@ -252,47 +177,10 @@ export default function CompanyAgencies() {
 
     setIsSubmitting(true);
     try {
-      let updatedNotes = editForm.notes;
-      if (editForm.password) {
-        if (updatedNotes.includes("[PASS:")) {
-          updatedNotes = updatedNotes.replace(/\[PASS:[^\]]+\]/, `[PASS:${editForm.password}]`);
-        } else {
-          updatedNotes = updatedNotes ? `${updatedNotes}\n[PASS:${editForm.password}]` : `[PASS:${editForm.password}]`;
-        }
-      }
-
-      const { error: updateErr } = await supabase
-        .from("agencies" as any)
-        .update({
-          name: editForm.name,
-          contact_email: editForm.email.trim().toLowerCase(),
-          contact_phone: editForm.phone,
-          country: editForm.country,
-          city: editForm.city,
-          license_number: editForm.licenseNumber,
-          status: editForm.status,
-          notes: updatedNotes,
-        } as any)
-        .eq("id", editForm.id);
-
-      if (updateErr) throw updateErr;
-
-      // If new password provided, update credentials via RPC
-      if (editForm.password) {
-        try {
-          await supabase.rpc("create_agency_account" as any, {
-            p_email: editForm.email.trim().toLowerCase(),
-            p_password: editForm.password,
-            p_name: editForm.contactPerson || editForm.name,
-            p_phone: editForm.phone,
-            p_agency_id: editForm.id,
-            p_company_id: companyId
-          });
-          toast({ title: "تم تحديث كلمة مرور حساب المكتب بنجاح 🔑" });
-        } catch (pwErr: any) {
-          console.warn("Password update warning:", pwErr);
-        }
-      }
+      const { data, error } = await supabase.functions.invoke("manage-agency-account", {
+        body: { action: "update", agencyId: editForm.id, companyId, ...editForm },
+      });
+      if (error || !data?.success) throw error || new Error(data?.error || "فشل تحديث المكتب");
 
       qc.invalidateQueries({ queryKey: ["company-agencies"] });
       toast({ title: "تم تحديث بيانات مكتب التوظيف بنجاح ✅" });
@@ -319,15 +207,13 @@ export default function CompanyAgencies() {
 
     setIsSubmitting(true);
     try {
-      const { error } = await supabase
-        .from("agencies" as any)
-        .delete()
-        .eq("id", selectedAgencyForDelete.id);
-
-      if (error) throw error;
+      const { data, error } = await supabase.functions.invoke("manage-agency-account", {
+        body: { action: "remove", companyId, agencyId: selectedAgencyForDelete.id },
+      });
+      if (error || !data?.success) throw error || new Error(data?.error || "تعذر إزالة المكتب");
 
       qc.invalidateQueries({ queryKey: ["company-agencies"] });
-      toast({ title: "تم حذف مكتب التوظيف بنجاح ✅" });
+      toast({ title: "تمت إزالة المكتب من شركتك بنجاح ✅" });
       setOpenDeleteDialog(false);
       if (selectedAgencyDetails?.id === selectedAgencyForDelete.id) {
         setSelectedAgencyDetails(null);
@@ -341,7 +227,7 @@ export default function CompanyAgencies() {
 
   const handleCopyCredentials = () => {
     if (!createdCredentials) return;
-    const text = `بيانات دخول مكتب التوظيف (${createdCredentials.name}):\nالبريد الإلكتروني: ${createdCredentials.email}\nكلمة المرور: ${createdCredentials.pass}\nالرابط: ${window.location.origin}/auth?role=agency`;
+    const text = `دعوة مكتب التوظيف (${createdCredentials.name}):\nالبريد الإلكتروني: ${createdCredentials.email}\nرابط الدخول: ${window.location.origin}/auth?role=agency`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     toast({ title: "تم نسخ بيانات الدخول للأن حافظة ✅" });
@@ -639,18 +525,7 @@ export default function CompanyAgencies() {
                     />
                   </div>
 
-                  <div className="space-y-1">
-                    <Label htmlFor="agencyPassword" className="text-xs font-bold">كلمة المرور (Password) *</Label>
-                    <Input 
-                      id="agencyPassword" 
-                      type="text"
-                      value={form.password} 
-                      onChange={e => setForm({...form, password: e.target.value})} 
-                      placeholder="أدخل كلمة مرور قوية للمكتب" 
-                      required 
-                      className="rounded-xl h-9 text-xs dir-ltr font-mono"
-                    />
-                  </div>
+                  <p className="text-xs text-muted-foreground self-center">هيتم إرسال دعوة للبريد الإلكتروني عشان مسؤول المكتب يختار كلمة مروره بنفسه.</p>
                 </div>
               </div>
 
@@ -710,7 +585,7 @@ export default function CompanyAgencies() {
                 تعديل بيانات مكتب التوظيف
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
-                يمكنك تحديث البيانات الأساسية أو تغيير كلمة مرور حساب الدخول للمكتب.
+                يمكنك تحديث البيانات الأساسية؛ تغيير كلمة المرور متاح لصاحب الحساب عبر استعادة كلمة المرور.
               </DialogDescription>
             </DialogHeader>
 
@@ -753,18 +628,7 @@ export default function CompanyAgencies() {
                   id="editEmail" 
                   type="email"
                   value={editForm.email} 
-                  onChange={e => setEditForm({...editForm, email: e.target.value})} 
-                  required 
-                  className="rounded-xl h-9 text-xs dir-ltr font-mono"
-                />
-
-                <Label htmlFor="editPassword" className="text-xs font-bold pt-1 block">تغيير كلمة المرور (اختياري)</Label>
-                <Input 
-                  id="editPassword" 
-                  type="text"
-                  value={editForm.password} 
-                  onChange={e => setEditForm({...editForm, password: e.target.value})} 
-                  placeholder="اتركه فارغاً للإبقاء على كلمة المرور الحالية" 
+                  readOnly
                   className="rounded-xl h-9 text-xs dir-ltr font-mono"
                 />
               </div>
@@ -821,10 +685,10 @@ export default function CompanyAgencies() {
                 <AlertTriangle className="w-6 h-6" />
               </div>
               <DialogTitle className="text-lg font-black text-foreground">
-                تأكيد حذف مكتب التوظيف
+                تأكيد إزالة مكتب التوظيف
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
-                هل أنت تأكد من رغبتك في حذف مكتب <strong>{selectedAgencyForDelete?.name}</strong>؟ لا يمكن التراجع عن هذا الإجراء وسيتم إلغاء وصول الحساب المرتبط بالمكتب.
+                سيتم فصل مكتب <strong>{selectedAgencyForDelete?.name}</strong> عن شركتك. لن تُحذف بيانات المكتب أو حسابه إذا كان يعمل مع شركات أخرى.
               </DialogDescription>
             </DialogHeader>
 
@@ -834,7 +698,7 @@ export default function CompanyAgencies() {
               </Button>
               <Button type="button" onClick={handleDeleteAgency} disabled={isSubmitting} className="rounded-xl h-10 text-xs font-bold gap-2 bg-rose-600 hover:bg-rose-700 text-white">
                 {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                تأكيد الحذف النهائي
+                تأكيد إزالة المكتب
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -850,13 +714,12 @@ export default function CompanyAgencies() {
                   تم تجهيز حساب دخول مكتب العمل بنجاح! 🎉
                 </DialogTitle>
                 <DialogDescription className="text-xs text-muted-foreground">
-                  يمكن لمسؤول مكتب <strong>{createdCredentials.name}</strong> تسجيل الدخول فوراً باستخدام البيانات التالية:
+                  اتبعتت دعوة إلى بريد مسؤول مكتب <strong>{createdCredentials.name}</strong> ليحدد كلمة مروره.
                 </DialogDescription>
               </DialogHeader>
 
               <div className="p-4 rounded-2xl bg-card border-2 border-emerald-500/30 space-y-2 font-mono text-xs shadow-sm" dir="ltr">
                 <p><strong className="font-sans text-foreground">Email:</strong> {createdCredentials.email}</p>
-                <p><strong className="font-sans text-foreground">Password:</strong> {createdCredentials.pass}</p>
                 <p className="text-[11px] text-muted-foreground font-sans pt-1">
                   <strong>Login Link:</strong> {window.location.origin}/auth?role=agency
                 </p>
@@ -865,7 +728,7 @@ export default function CompanyAgencies() {
               <div className="flex gap-2 pt-2">
                 <Button onClick={handleCopyCredentials} className="w-full rounded-xl h-10 text-xs font-bold gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
                   {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                  {copied ? "تم النسخ بنجاح!" : "نسخ بيانات الدخول للمكتب 📋"}
+                  {copied ? "تم النسخ بنجاح!" : "نسخ البريد ورابط الدخول 📋"}
                 </Button>
               </div>
             </DialogContent>
