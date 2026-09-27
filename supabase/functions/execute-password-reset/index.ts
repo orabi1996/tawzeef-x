@@ -58,18 +58,24 @@ Deno.serve(async (req) => {
       return json({ error: "انتهت صلاحية الرمز، يرجى طلب رابط جديد" }, 400);
     }
 
+    // Claim the token atomically before changing Auth credentials. A second
+    // concurrent request must not be able to reuse the same reset link.
+    const { data: claimed, error: claimError } = await adminClient.from("password_reset_tokens")
+      .update({ consumed_at: new Date().toISOString() })
+      .eq("id", tokenRow.id)
+      .is("consumed_at", null)
+      .gt("expires_at", new Date().toISOString())
+      .select("id")
+      .maybeSingle();
+    if (claimError) throw claimError;
+    if (!claimed) return json({ error: "الرمز مستخدم أو منتهي الصلاحية" }, 400);
+
     // Update user password
     const { error: updateErr } = await adminClient.auth.admin.updateUserById(
       tokenRow.user_id,
       { password }
     );
     if (updateErr) throw updateErr;
-
-    // Consume the token
-    await adminClient
-      .from("password_reset_tokens")
-      .update({ consumed_at: new Date().toISOString() })
-      .eq("id", tokenRow.id);
 
     console.log(`Password successfully reset for user: ${normalizedEmail}`);
     return json({ success: true, message: "تم تغيير كلمة المرور بنجاح." });

@@ -230,18 +230,14 @@ export default function StageActions(props: StageActionsProps) {
 
   const triggerAIEvaluation = async () => {
     try {
-      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/evaluate-candidate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({ candidateId, jobId }),
+      const { error } = await supabase.functions.invoke("evaluate-candidate", {
+        body: { candidateId, jobId },
       });
+      if (error) throw error;
       await queryClient.invalidateQueries({ queryKey: ["candidates"] });
       toast({ title: "تم تشغيل التقييم الذكي تلقائياً ✅" });
-    } catch {
-      // silent fail
+    } catch (error) {
+      console.error("Automatic AI evaluation failed:", error);
     }
   };
 

@@ -233,7 +233,7 @@ Deno.serve(async (req) => {
     // If port is 587 or 25, we MUST set secure to false (Nodemailer uses STARTTLS automatically).
     const isSecureConnection = (smtpPort === 465) ? true : (smtpPort === 587 || smtpPort === 25 ? false : smtpSecure);
 
-    const resetUrl = `${req.headers.get("origin") || "https://ai-hire-buddy-22.lovable.app"}/reset-password?token=${token}&email=${encodeURIComponent(normalizedEmail)}`;
+    const resetUrl = `${(Deno.env.get("APP_URL") || "https://www.tawzeefx.com").replace(/\/$/, "")}/reset-password?token=${encodeURIComponent(token)}&email=${encodeURIComponent(normalizedEmail)}`;
 
     let emailSubject = "إعادة تعيين كلمة المرور - Tawzeef-X";
     let emailHtml = `

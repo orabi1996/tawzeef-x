@@ -470,27 +470,13 @@ export default function Pipeline() {
       // 1. Auto-run AI Evaluation if configured and not evaluated yet
       if (automationRules.auto_ai_evaluation && (candidate as any).ai_score == null) {
         toast({ title: "🤖 أتمتة الذكاء الاصطناعي", description: `جاري تشغيل التقييم التلقائي لـ ${candidate.name}...` });
-        fetch(EVAL_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({
-            candidate_id: candidate.id,
-            candidate_name: candidate.name,
-            candidate_email: candidate.email,
-            resume_text: (candidate as any).notes || "",
-            skills: (candidate as any).skills || [],
-            experience_years: (candidate as any).experience_years || 0,
-            education: (candidate as any).education || "",
-            company_id: (candidate as any).company_id,
-          }),
-        }).then(async (res) => {
-          if (res.ok) {
+        supabase.functions.invoke("evaluate-candidate", {
+          body: { candidateId: candidate.id, jobId: candidate.job_id },
+        }).then(async ({ error }) => {
+          if (!error) {
             toast({ title: `✅ تم اكتمال تقييم AI لـ ${candidate.name}` });
             queryClient.invalidateQueries({ queryKey: ["candidates"] });
-          }
+          } else console.error("Automatic AI evaluation failed:", error);
         }).catch(console.error);
       }
 
