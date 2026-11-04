@@ -518,7 +518,7 @@ DATA: ${JSON.stringify({ name: activeMember.name, role: activeMember.role, month
         dir={dir}
       >
         
-        <a href="/evaluation/cycles" className="block rounded-xl border border-primary/40 bg-primary/5 p-4 font-semibold print:hidden">
+        <a href="/evaluation" className="block rounded-xl border border-primary/40 bg-primary/5 p-4 font-semibold print:hidden">
           {locale === "ar" ? "دورات تقييم ٣٦٠ المستقلة ← إنشاء دورة، تكليف المشاركين، وعرض النتائج المجمّعة" : "Independent 360 cycles → Create a cycle, assign reviewers, and view aggregate results"}
         </a>
         {/* Page Header */}
@@ -528,7 +528,7 @@ DATA: ${JSON.stringify({ name: activeMember.name, role: activeMember.role, month
               <div className="p-2 bg-primary/10 rounded-xl text-primary border border-primary/20 shadow-sm animate-pulse">
                 <Award className="w-6.5 h-6.5" />
               </div>
-              <span>{locale === "ar" ? "تقييم الأداء الشامل (360 درجة)" : "360-Degree Performance Evaluation"}</span>
+              <span>{locale === "ar" ? "سجل التقييم اليدوي السابق" : "Previous manual evaluation log"}</span>
             </h1>
             <p className="text-muted-foreground text-sm mt-2 max-w-2xl leading-relaxed">
               {locale === "ar" 

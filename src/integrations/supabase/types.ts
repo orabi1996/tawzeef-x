@@ -3021,6 +3021,17 @@ export type Database = {
       }
       tasks: {
         Row: {
+          company_id: string | null
+          assignee_id: string | null
+          reviewer_id: string | null
+          expected_outcome: string
+          completion_note: string
+          blocked_reason: string
+          cycle_id: string | null
+          archived_at: string | null
+          completed_at: string | null
+          version: number
+          events: Json
           assignee: string
           assignee_en: string | null
           candidate_id: string | null
@@ -3041,6 +3052,17 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          company_id?: string | null
+          assignee_id?: string | null
+          reviewer_id?: string | null
+          expected_outcome?: string
+          completion_note?: string
+          blocked_reason?: string
+          cycle_id?: string | null
+          archived_at?: string | null
+          completed_at?: string | null
+          version?: number
+          events?: Json
           assignee: string
           assignee_en?: string | null
           candidate_id?: string | null
@@ -3061,6 +3083,17 @@ export type Database = {
           user_id: string
         }
         Update: {
+          company_id?: string | null
+          assignee_id?: string | null
+          reviewer_id?: string | null
+          expected_outcome?: string
+          completion_note?: string
+          blocked_reason?: string
+          cycle_id?: string | null
+          archived_at?: string | null
+          completed_at?: string | null
+          version?: number
+          events?: Json
           assignee?: string
           assignee_en?: string | null
           candidate_id?: string | null
@@ -3203,6 +3236,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      task_workflow: {
+        Args: { _company_id: string; _action: string; _payload?: Json }
+        Returns: Json
+      }
       performance360: {
         Args: { _company_id: string; _action: string; _payload?: Json }
         Returns: Json

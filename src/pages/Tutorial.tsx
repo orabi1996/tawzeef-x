@@ -288,19 +288,19 @@ const SYSTEM_MODULES: SystemGuideModule[] = [
     id: "tasks",
     titleAr: "لوحة إدارة المهام وفريق العمل",
     titleEn: "Task Board & Workflow",
-    descAr: "إدارة ومتابعة مهام فريق التوظيف والموارد البشرية، تعيين المسؤولين ومواعيد الاستحقاق، مع لوحة كانبان متطورة للمهام (قيد الانتظار، قيد التنفيذ، مكتملة).",
+    descAr: "تخطيط المهام داخل الشركة بمسؤول وناتج وموعد، ثم تنفيذ موثق ومراجعة اختيارية وإكمال.",
     descEn: "Manage HR & recruiting team tasks with assignment, due dates, priority labels, and status Kanban transitions.",
     stepsAr: [
       "افتح 'إدارة المهام' من شريط التنقل أو قائمة الأداء.",
-      "اضغط 'مهمة جديدة' وأدخل العنوان، المسؤول، الوظيفة المرتبطة، وتاريخ الإنجاز.",
-      "اسحب المهام بين أعمدة الحالة (جديد، قيد التنفيذ، مكتمل).",
-      "استعرض مؤشرات الإنجاز ونسبة المهام المكتملة لكل عضو فريق."
+      "أضف مهمة بعنوان وناتج مطلوب ومسؤول من حسابات الشركة وموعد تسليم ومراجع اختياري.",
+      "افتح تفاصيل المهمة لبدء التنفيذ وتوثيق الأنشطة والناتج وحل العوائق قبل التسليم.",
+      "المراجع المحدد يعتمد المهمة أو يعيدها بسبب. راجع المتأخرات والأرشيف وسجل التغييرات."
     ],
     stepsEn: [
       "Open 'Task Board' from navigation or workspace switcher.",
-      "Add tasks with assignees, due dates, and priorities.",
-      "Move tasks seamlessly between status columns.",
-      "Monitor task completion rates and team productivity."
+      "Plan a task with a real assignee, expected outcome, deadline and optional reviewer.",
+      "Use task details to start work, complete activities, record results and clear blockers.",
+      "The assigned reviewer approves or returns work with a reason. Review overdue tasks, archive and history."
     ],
     path: "/tasks",
     icon: CheckSquare,
@@ -329,7 +329,7 @@ const SYSTEM_MODULES: SystemGuideModule[] = [
       "Each assigned account submits once, rating each criterion from 1 to 5 or not observed.",
       "Close the cycle to release results to the subject and administrators; confidential groups need three valid responses per criterion."
     ],
-    path: "/evaluation/cycles",
+    path: "/evaluation",
     icon: Target,
     category: "performance",
     badgeAr: "مهام وأداء",

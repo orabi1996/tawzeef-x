@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Outlet, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CompanyProvider } from "@/contexts/CompanyContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
@@ -154,8 +154,9 @@ function AnimatedRoutes() {
         <Route path="/tasks" element={<RoleProtectedRoute allowedRoles={["admin", "recruiter", "reviewer"]}><TaskBoard /></RoleProtectedRoute>} />
         <Route path="/task-board" element={<RoleProtectedRoute allowedRoles={["admin", "recruiter", "reviewer"]}><TaskBoard /></RoleProtectedRoute>} />
         <Route path="/evaluation/cycles" element={<RoleProtectedRoute screenPath="/evaluation" allowedRoles={["admin", "recruiter", "reviewer"]}><Performance360 /></RoleProtectedRoute>} />
-        <Route path="/evaluation" element={<RoleProtectedRoute allowedRoles={["admin", "recruiter", "reviewer"]}><PerformanceEvaluation /></RoleProtectedRoute>} />
-        <Route path="/performance-evaluation" element={<RoleProtectedRoute allowedRoles={["admin", "recruiter", "reviewer"]}><PerformanceEvaluation /></RoleProtectedRoute>} />
+        <Route path="/evaluation" element={<RoleProtectedRoute allowedRoles={["admin", "recruiter", "reviewer"]}><Performance360 /></RoleProtectedRoute>} />
+        <Route path="/evaluation/manual" element={<RoleProtectedRoute screenPath="/evaluation" allowedRoles={["admin", "recruiter", "reviewer"]}><PerformanceEvaluation /></RoleProtectedRoute>} />
+        <Route path="/performance-evaluation" element={<Navigate to="/evaluation" replace />} />
 
         <Route path="/question-bank" element={<RoleProtectedRoute allowedRoles={["admin", "recruiter"]}><QuestionBank /></RoleProtectedRoute>} />
         <Route path="/library" element={<RoleProtectedRoute allowedRoles={["admin", "recruiter", "reviewer"]}><SystemLibrary /></RoleProtectedRoute>} />

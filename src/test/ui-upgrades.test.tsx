@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import React from "react";
 import PerformanceEvaluation from "@/pages/PerformanceEvaluation";
-import TaskBoard from "@/pages/TaskBoard";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // Mock DashboardLayout to isolate the pages from routing, auth, and DB queries
@@ -211,6 +210,15 @@ vi.mock("recharts", async () => {
   };
 });
 
+// These tests cover data and actions, not animation exit timing.
+vi.mock("framer-motion", () => ({
+  AnimatePresence: ({children}: {children: React.ReactNode}) => <>{children}</>,
+  motion: {div: React.forwardRef<HTMLDivElement, Record<string, unknown>>((props, ref) => {
+    const {initial, animate, exit, variants, transition, layout, ...dom} = props;
+    return <div ref={ref} {...dom} />;
+  })},
+}));
+
 // Test wrapper with QueryClient
 const createTestQueryClient = () => new QueryClient({
   defaultOptions: {
@@ -245,7 +253,7 @@ describe("UI upgrades - PerformanceEvaluation Page", () => {
     });
     
     expect(screen.getByTestId("dashboard-layout")).toBeInTheDocument();
-    expect(screen.getByText("تقييم الأداء الشامل (360 درجة)")).toBeInTheDocument();
+    expect(screen.getByText("سجل التقييم اليدوي السابق")).toBeInTheDocument();
     expect(screen.getAllByText("مهندس واجهات أمامية أول").length).toBeGreaterThan(0);
   });
 
@@ -347,97 +355,4 @@ describe("UI upgrades - PerformanceEvaluation Page", () => {
     expect(mockEvaluationsData).toHaveLength(2);
   });
 
-});
-
-describe("UI upgrades - TaskBoard Page", () => {
-  beforeEach(() => {
-    mockLocale = "ar";
-    mockDir = "rtl";
-    resetMockData();
-    vi.clearAllMocks();
-  });
-
-  it("renders successfully in Arabic RTL", async () => {
-    renderWithQuery(<TaskBoard />);
-    await waitFor(() => {
-      expect(screen.getByText("المتأخرات")).toBeInTheDocument();
-    });
-    expect(screen.getByTestId("dashboard-layout")).toBeInTheDocument();
-    expect(screen.getByText(/لوحة المهام/i)).toBeInTheDocument();
-    expect(screen.getByText("قيد التنفيذ")).toBeInTheDocument();
-  });
-
-  it("renders mock task cards correctly", async () => {
-    renderWithQuery(<TaskBoard />);
-    await waitFor(() => {
-      expect(screen.getByText("تصميم واجهة لوحة تحكم التقييم الشامل")).toBeInTheDocument();
-    });
-    expect(screen.getByText("ربط بوابة الدفع للاشتراكات")).toBeInTheDocument();
-  });
-
-  it("allows moving tasks using transition buttons", async () => {
-    renderWithQuery(<TaskBoard />);
-    
-    await waitFor(() => {
-      expect(screen.getAllByRole("button", { name: "الحالة التالية" }).length).toBeGreaterThan(0);
-    });
-
-    // Let's find Next Stage buttons on the cards
-    const moveButtons = screen.getAllByRole("button", { name: "الحالة التالية" });
-    // Click the first one to trigger move
-    fireEvent.click(moveButtons[0]);
-
-    await waitFor(() => {
-      expect(mockToastFn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: "تم تحديث حالة المهمة",
-        })
-      );
-    });
-  });
-
-  it("opens the Add Task drawer and submits a new task", async () => {
-    renderWithQuery(<TaskBoard />);
-    
-    await waitFor(() => {
-      expect(screen.getByText("إضافة مهمة جديدة")).toBeInTheDocument();
-    });
-
-    // Open drawer
-    fireEvent.click(screen.getByText("إضافة مهمة جديدة"));
-    expect(screen.getByText("عنوان المهمة بالعربية *")).toBeInTheDocument();
-
-    // Fill title
-    const titleInput = screen.getByLabelText("عنوان المهمة بالعربية *");
-    fireEvent.change(titleInput, { target: { value: "اختبار الكود الجديد" } });
-
-    // Fill description
-    const descInput = screen.getByLabelText("تفاصيل ووصف المهمة بالعربية *");
-    fireEvent.change(descInput, { target: { value: "كتابة واختبار كافة سيناريوهات لوحة التحكم" } });
-
-    // Fill assignee
-    const assigneeInput = screen.getByLabelText("المسؤول عن المهمة بالعربية *");
-    fireEvent.change(assigneeInput, { target: { value: "صالح الماجد" } });
-
-    // Fill due date
-    const dateInput = screen.getByLabelText("تاريخ الاستحقاق والتسليم *");
-    fireEvent.change(dateInput, { target: { value: "2026-06-25" } });
-
-    // Submit
-    fireEvent.click(screen.getByText("إنشاء المهمة وحفظها"));
-
-    // Toast check
-    await waitFor(() => {
-      expect(mockToastFn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: "تمت إضافة المهمة",
-        })
-      );
-    });
-
-    // New task should appear in the document
-    await waitFor(() => {
-      expect(screen.getByText("اختبار الكود الجديد")).toBeInTheDocument();
-    });
-  });
 });

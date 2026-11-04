@@ -911,101 +911,45 @@ export const SCREEN_GUIDES: ScreenGuideItem[] = [
   {
     id: "tasks",
     matchPaths: ["/tasks", "/task-board"],
-    titleAr: "لوحة إدارة المهام وفريق العمل",
-    titleEn: "HR Task Board & Workflow",
-    badgeAr: "أداء ومهام",
-    badgeEn: "Tasks",
-    category: "performance",
-    icon: CheckSquare,
-    color: "text-blue-600",
-    bg: "bg-blue-600/10",
-    border: "border-blue-600/20",
-    summaryAr: "إدارة ومتابعة مهام التوظيف والموارد البشرية عبر لوحة كانبان تفاعلية، وتعيين المسؤوليات وتواريخ الاستحقاق ومراقبة نسبة الإنجاز.",
-    summaryEn: "Manage team tasks with status Kanban boards, deadlines, priorities, and productivity metrics.",
-    targetAudienceAr: "مسؤولو التوظيف، قادة الفرق، مدراء الموارد البشرية",
-    targetAudienceEn: "Team Leads, HR Specialists, Recruiters",
+    titleAr: "إدارة المهام والتنفيذ والمراجعة", titleEn: "Task planning, execution and review",
+    badgeAr: "أداء ومهام", badgeEn: "Tasks", category: "performance", icon: CheckSquare,
+    color: "text-blue-600", bg: "bg-blue-600/10", border: "border-blue-600/20",
+    summaryAr: "مهام داخل الشركة بمسؤول من حسابات الفريق، وناتج واضح وموعد تسليم، مع مراجعة اختيارية وسجل تغييرات وأرشفة قابلة للاسترجاع.",
+    summaryEn: "Company-scoped tasks with real account assignees, agreed outcomes, deadlines, optional review, history and reversible archive.",
+    targetAudienceAr: "أعضاء الشركة ومسؤولو الفريق", targetAudienceEn: "Company members and team administrators",
     workflowStages: [
-      { stepNumber: 1, labelAr: "إنشاء المهمة", labelEn: "Create Task" },
-      { stepNumber: 2, labelAr: "تعيين المسؤول", labelEn: "Assign & Deadline" },
-      { stepNumber: 3, labelAr: "تنفيذ العمل", labelEn: "In Progress" },
-      { stepNumber: 4, labelAr: "الإنجاز والاعتماد", labelEn: "Mark Completed" },
+      {stepNumber:1,labelAr:"التخطيط والتكليف",labelEn:"Plan and assign"},
+      {stepNumber:2,labelAr:"التنفيذ وتوثيق الناتج",labelEn:"Execute and document"},
+      {stepNumber:3,labelAr:"المراجعة عند التكليف",labelEn:"Review when assigned"},
+      {stepNumber:4,labelAr:"الإكمال والمتابعة",labelEn:"Complete and follow up"}
     ],
     steps: [
-      {
-        stepNumber: 1,
-        titleAr: "إضافة مهمة جديدة",
-        titleEn: "Create New Task",
-        actionAr: "اضغط على زر 'مهمة جديدة' في أعلى الشاشة وأدخل عنوان المهمة، الوصف، والأولوية (عاجلة / متوسطة / منخفضة).",
-        actionEn: "Click 'New Task' button, enter title, description, and priority level.",
-        expectedOutcomeAr: "ظهور المهمة في عمود 'قيد الانتظار / المهام الجديدة'.",
-        expectedOutcomeEn: "Task appears in the 'Pending' column.",
-              actionTrigger: {
-          labelAr: "إضافة مهمة جديدة الآن ⚡",
-          labelEn: "Add New Task ⚡",
-          actionType: "navigate",
-          target: "/tasks?action=new",
-        },
-      },
-      {
-        stepNumber: 2,
-        titleAr: "تعيين المسؤول وتاريخ الاستحقاق",
-        titleEn: "Assign Member & Set Due Date",
-        actionAr: "اختر العضو المسؤول من فريق التوظيف وحدد الموعد النهائي للإنجاز، واربط المهمة بوظيفة معينة إذا رغبت.",
-        actionEn: "Assign to a team member, set deadline, and link to a specific job if applicable.",
-        expectedOutcomeAr: "إرسال إشعار للموظف وإدراج المهمة في تقويمه وأولوياته اليومية.",
-        expectedOutcomeEn: "Assignee notified and task scheduled on their priority feed."
-      },
-      {
-        stepNumber: 3,
-        titleAr: "تحديث حالة المهام بالسحب والإفلات",
-        titleEn: "Move Tasks Across Progress Columns",
-        actionAr: "اسحب بطاقة المهمة بين أعمدة: 'جديدة' ← 'قيد التنفيذ' ← 'مكتملة'.",
-        actionEn: "Drag and drop cards between Pending, In Progress, and Completed columns.",
-        expectedOutcomeAr: "تحديث تقدم المشروع ومؤشرات الأداء اللحظية للفريق.",
-        expectedOutcomeEn: "Real-time task completion rate updates."
-      }
+      {stepNumber:1,titleAr:"حدد المطلوب والمسؤول",titleEn:"Define outcome and ownership",
+      actionAr:"أنشئ مهمة بعنوان وناتج مطلوب وموعد تسليم. مسؤول الشركة يستطيع تكليف أعضاء آخرين؛ العضو ينشئ مهامه لنفسه. اختر مراجعًا مختلفًا إذا لزم اعتماد مستقل.",
+      actionEn:"Create a task with title, outcome and due date. Administrators can assign others; members create their own tasks. Select a different reviewer for independent approval.",
+      expectedOutcomeAr:"تظهر المهمة ضمن المخططة لحسابات المنشئ والمسؤول والمراجع ومسؤولي الشركة.",expectedOutcomeEn:"The planned task appears for its creator, assignee, reviewer and company administrators.",
+      actionTrigger:{labelAr:"إضافة مهمة الآن",labelEn:"New task",actionType:"navigate",target:"/tasks?action=new"}},
+      {stepNumber:2,titleAr:"نفّذ وسجّل الناتج",titleEn:"Execute and document",
+      actionAr:"المسؤول يبدأ التنفيذ من التفاصيل، ويضيف أنشطة ويحدّثها ويسجّل ناتج التنفيذ وأي عائق. احفظ تحديث التنفيذ قبل تغيير الحالة.",
+      actionEn:"The assignee starts work from task details, records activities, results and blockers. Save work updates before changing status.",
+      expectedOutcomeAr:"يُمنع التسليم دون ناتج أو مع أنشطة ناقصة أو عائق قائم.",expectedOutcomeEn:"Submission requires a result, completed activities and no unresolved blocker."},
+      {stepNumber:3,titleAr:"راجع ثم اعتمد أو أعد للتعديل",titleEn:"Review and approve or return",
+      actionAr:"المراجع المحدد وحده يعتمد العمل أو يعيده للتعديل مع السبب. دون مراجع يؤكد المسؤول الإكمال. يمكن للمنشئ أو مسؤول الشركة إعادة الفتح بسبب موثق أو الأرشفة والاسترجاع.",
+      actionEn:"Only the assigned reviewer approves or returns work with a reason. Without a reviewer, the assignee confirms completion. Creators and administrators can reopen with a reason or archive and restore.",
+      expectedOutcomeAr:"حالة وسجل تغييرات واضحان؛ لا تُحتسب المهام تلقائيًا كدرجات أداء.",expectedOutcomeEn:"A clear status and activity history; task counts never automatically become performance scores."}
     ],
-    keyButtons: [
-      {
-        nameAr: "مهمة جديدة (+)",
-        nameEn: "New Task (+)",
-        descriptionAr: "يفتح نافذة إنشاء وتكليف مهمة جديدة.",
-        descriptionEn: "Opens task creation and assignment form.",
-        actionType: "primary"
-      },
-      {
-        nameAr: "تصفية مهامي فقط",
-        nameEn: "My Tasks Only",
-        descriptionAr: "يعرض المهام الموكلة إليك أنت فقط لإنجازها سريعاً.",
-        descriptionEn: "Filters board strictly to tasks assigned to you.",
-        actionType: "action"
-      }
+    keyButtons:[
+      {nameAr:"إضافة مهمة جديدة",nameEn:"New task",descriptionAr:"تخطيط مهمة من الصفر أو بقالب اختياري.",descriptionEn:"Plan a task from scratch or an optional template.",actionType:"primary"},
+      {nameAr:"بانتظار مراجعتي",nameEn:"Awaiting my review",descriptionAr:"يعرض المهام المسلّمة لك للمراجعة.",descriptionEn:"Filter work submitted to you for review.",actionType:"action"},
+      {nameAr:"الأرشيف",nameEn:"Archive",descriptionAr:"عرض المهام المؤرشفة واسترجاع ما لديك صلاحية إدارته.",descriptionEn:"View archived tasks and restore those you manage.",actionType:"action"}
     ],
-    proTips: [
-      {
-        titleAr: "اربط المهام بالوظائف والمرشحين",
-        titleEn: "Link Tasks to Jobs",
-        descriptionAr: "ربط المهمة بوظيفة معينة يتيح لجميع أعضاء اللجنة رؤية المهام المرتبطة بها في ملف الوظيفة مباشرة.",
-        descriptionEn: "Linking tasks to jobs makes them visible inside the job details card."
-      }
-    ],
-    faqs: [
-      {
-        qAr: "هل يتم إشعار الموظف عند تكليفه بمهمة؟",
-        qEn: "Is assignee alerted when assigned?",
-        aAr: "نعم، يستلم الموظف إشعاراً في جرس الإشعارات بالمنصة فوراً.",
-        aEn: "Yes, immediate notification appears in the notification bell."
-      }
-    ],
-    quickLinks: [
-      { labelAr: "تقييم الأداء 360", labelEn: "Evaluation", path: "/evaluation" },
-      { labelAr: "إدارة الفريق", labelEn: "Team", path: "/team" },
-      { labelAr: "شاشة الوظائف", labelEn: "Jobs", path: "/jobs" }
-    ]
+    proTips:[{titleAr:"المتابعة بعد التقييم",titleEn:"Follow up a review",descriptionAr:"من تقرير الدورة المغلقة أنشئ مهمة تطوير بناتج وموعد. الربط مرجع للمناقشة ولا يغيّر درجة التقييم.",descriptionEn:"Create a development task from a closed-cycle report. The link supports discussion and never changes review scores."}],
+    faqs:[{qAr:"هل يصل إشعار تلقائي أو موعد في التقويم؟",qEn:"Are notifications or calendar entries automatic?",aAr:"لا. تظهر المهمة داخل حسابات المشاركين في لوحة المهام؛ لم يُضف إرسال تلقائي للبريد أو التقويم.",aEn:"No. Tasks appear in participants’ task boards; automatic email and calendar delivery are not implemented."}],
+    quickLinks:[{labelAr:"تقييم الأداء",labelEn:"Performance reviews",path:"/evaluation"},{labelAr:"إدارة الفريق",labelEn:"Team",path:"/team"}]
   },
   {
     id: "evaluation",
-    matchPaths: ["/evaluation", "/performance-evaluation", "/evaluation/cycles"],
+    matchPaths: ["/evaluation", "/performance-evaluation", "/evaluation/cycles", "/evaluation/manual"],
     titleAr: "تقييم الأداء المؤسسي الشامل (360 Degree)",
     titleEn: "360-Degree Performance Evaluation",
     badgeAr: "أداء ومهام",
@@ -1015,8 +959,8 @@ export const SCREEN_GUIDES: ScreenGuideItem[] = [
     color: "text-amber-600",
     bg: "bg-amber-600/10",
     border: "border-amber-600/20",
-    summaryAr: "دورات مستقلة عبر /evaluation/cycles بمعايير وأوزان محددة، وتكليف المشاركين من نفس الشركة، وإجابات من حساباتهم. يبقى السجل اليدوي القديم منفصلًا.",
-    summaryEn: "Independent cycles at /evaluation/cycles use explicit criteria and weights, same-company assignments and responses from assigned accounts. The previous manual log remains separate.",
+    summaryAr: "دورات مستقلة من شاشة تقييم الأداء بمعايير وأوزان محددة، وتكليف المشاركين من نفس الشركة، وإجابات من حساباتهم. يمكن تعديل المسودة قبل الفتح، ويبقى السجل اليدوي السابق منفصلًا.",
+    summaryEn: "Independent cycles on the performance review page use explicit criteria and weights, same-company assignments and responses from assigned accounts. Drafts can be edited before opening; the previous manual log remains separate.",
     targetAudienceAr: "مدراء الموارد البشرية، رؤساء الأقسام، الموظفون",
     targetAudienceEn: "HR Directors, Department Heads, Employees",
     workflowStages: [
@@ -1050,7 +994,7 @@ export const SCREEN_GUIDES: ScreenGuideItem[] = [
       aAr: "لا تظهر الإجابات الفردية. يلزم ثلاثة ردود صالحة لكل معيار في الفئة لعرض متوسطها. المسؤول يعرف قائمة المشاركين. هذه الحماية تخص الدورات المستقلة، وليس السجل اليدوي القديم.",
       aEn: "Individual answers are not shown. Each confidential group needs three valid responses per criterion to reveal its mean. Administrators know the roster. This protection applies to independent cycles, not the old manual log." }],
     quickLinks: [
-      { labelAr: "الدورات المستقلة", labelEn: "Independent cycles", path: "/evaluation/cycles" },
+      { labelAr: "السجل اليدوي السابق", labelEn: "Previous manual log", path: "/evaluation/manual" },
       { labelAr: "لوحة المهام", labelEn: "Task Board", path: "/tasks" },
       { labelAr: "التقارير التحليلية", labelEn: "Reports", path: "/reports" },
       { labelAr: "إدارة الفريق", labelEn: "Team", path: "/team" }
