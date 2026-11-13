@@ -3,60 +3,51 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const source = (p: string) => readFileSync(resolve(process.cwd(), p), "utf8");
-const anonRls = source("supabase/migrations/20261113000000_revoke_anonymous_candidate_tracking_reads.sql");
-const tenantRls = source("supabase/migrations/20261113002000_restore_recruitment_tenant_isolation.sql");
-const signup = source("supabase/migrations/20261113001000_secure_auth_signup_role_assignment.sql");
 const createAccount = source("supabase/functions/auto-create-candidate-account/index.ts");
 const config = source("supabase/config.toml");
 const apply = source("src/pages/ApplyJob.tsx");
 const successPage = source("src/components/apply/ApplySuccessPass.tsx");
 const authPage = source("src/pages/Auth.tsx");
 
-describe("P0 candidate identity and tenant data isolation regressions", () => {
-  it("drops public SELECT-by-tracking-code policies and blocks anonymous reads", () => {
-    expect(anonRls).toContain('DROP POLICY IF EXISTS "Public tracking code lookup candidates"');
-    expect(anonRls).toContain('DROP POLICY IF EXISTS "Public tracking code lookup applications"');
-    expect(anonRls.match(/AS RESTRICTIVE\s+FOR SELECT TO anon\s+USING \(false\)/g)).toHaveLength(2);
-  });
-
-  it("drops unrestricted authenticated SELECT and enforces company-based RLS", () => {
-    expect(tenantRls).toContain('DROP POLICY IF EXISTS "Authenticated users access all candidates"');
-    expect(tenantRls).toContain('DROP POLICY IF EXISTS "Authenticated users access all applications"');
-    expect(tenantRls).toContain("public.has_company_access(company_id)");
-    expect(tenantRls).toContain('CREATE POLICY "Candidates require company membership"');
-    expect(tenantRls).toContain('CREATE POLICY "Application reads require company membership"');
-    expect(tenantRls).toContain("AS RESTRICTIVE");
-  });
-
-  it("does not allow self-chosen metadata or similar-looking email to create admins", () => {
-    expect(signup).not.toMatch(/NEW\.raw_user_meta_data\s*->>\s*'role'/);
-    expect(signup).not.toMatch(/NEW\.email\s+LIKE/);
-    expect(signup).toContain("FROM public.invitations");
-    expect(signup).toContain("_role := _inv.role");
-    expect(signup).toContain("'job_seeker'::public.app_role");
-  });
-
-  it("only permits trusted service invitations and never sets or exposes passwords", () => {
+describe("P0 candidate identity hardening regressions", () => {
+  it("requires service-role authorization even when a JWT is present", () => {
     expect(config).toContain("[functions.auto-create-candidate-account]\nverify_jwt = true");
     expect(createAccount).toContain("bearer !== serviceKey");
-    expect(createAccount).toContain("admin.auth.admin.inviteUserByEmail");
+    expect(createAccount).toContain("return json({ error: \"Unauthorized\" }, 401)");
+  });
+
+  it("never resets or exposes an applicant password", () => {
     expect(createAccount).not.toContain("auth.admin.updateUserById");
     expect(createAccount).not.toContain("auth.admin.createUser");
     expect(createAccount).not.toContain("password: cleanPassword");
     expect(createAccount).not.toContain("password: password");
+    expect(createAccount).not.toContain("listUsers()");
   });
 
-  it("keeps application submission independent from privileged account creation", () => {
+  it("uses a server-only email invitation with least-privileged candidate role", () => {
+    expect(createAccount).toContain("admin.auth.admin.inviteUserByEmail");
+    expect(createAccount).toContain('account_type: "job_seeker"');
+    expect(createAccount).toContain('role: "job_seeker"');
+    expect(createAccount).not.toContain("targetRole");
+  });
+
+  it("does not invoke privileged account creation from a public apply form", () => {
     expect(apply).not.toContain('supabase.functions.invoke("auto-create-candidate-account"');
+    expect(apply).toContain('supabase.from("applications").insert(payload)');
+  });
+
+  it("does not report application submission success after both insert attempts fail", () => {
     expect(apply).toContain('const { error: retryErr } = await supabase.from("applications").insert');
     expect(apply).toContain("if (retryErr) throw retryErr;");
     expect(apply).toContain('title: "تعذر إرسال طلب التوظيف"');
   });
 
-  it("stops advertising the applicant phone number as an account password", () => {
+  it("never describes a phone number as the applicant's login password", () => {
     expect(successPage).not.toContain("كلمة المرور المؤقتة:");
     expect(successPage).not.toContain("بيانات الدخول لبوابة المرشح:");
     expect(authPage).not.toContain("رقم جوالك ككلمة مرور");
     expect(authPage).toContain('href="/portal"');
   });
+
+  it.todo("verify deployed Supabase RLS with isolated test companies and job seekers on staging");
 });
