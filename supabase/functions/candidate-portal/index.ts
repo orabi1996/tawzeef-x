@@ -2,19 +2,11 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getExtendedCorsHeaders } from "../_shared/cors.ts";
 import { checkRateLimit, rateLimitResponse } from "../_shared/rateLimiter.ts";
+import { PORTAL_TOKEN_TTL_MS, getCandidatePortalTicketKey, issueCandidatePortalTicket, validateCandidatePortalTicket } from "../_shared/candidatePortalTicket.ts";
 
 const PORTAL_URL = "https://www.tawzeefx.com/portal";
-const PORTAL_TOKEN_TTL_MS = 15 * 60 * 1000;
 const GENERIC_EMAIL_MESSAGE =
   "إذا كان البريد الإلكتروني مرتبطاً بطلب توظيف، فستصلك رسالة برابط آمن لمتابعة الطلب. الرابط صالح لمدة 15 دقيقة.";
-const encoder = new TextEncoder();
-const decoder = new TextDecoder();
-
-interface PortalTicket {
-  email: string;
-  trackingCode: string | null;
-  expiresAt: number;
-}
 
 const json = (payload: unknown, status: number, headers: Record<string, string>) =>
   new Response(JSON.stringify(payload), {
@@ -26,77 +18,6 @@ const json = (payload: unknown, status: number, headers: Record<string, string>)
       "Referrer-Policy": "no-referrer",
     },
   });
-
-function toBase64Url(bytes: Uint8Array): string {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-function fromBase64Url(value: string): Uint8Array {
-  if (!/^[a-zA-Z0-9_-]+$/.test(value) || value.length > 2048) {
-    throw new Error("Invalid portal ticket");
-  }
-  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
-  const binary = atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "="));
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
-}
-
-// The dedicated secret can be rotated independently. The Supabase service key is
-// used as a server-side fallback so existing deployments can adopt this fix without
-// introducing a new environment dependency. Neither key is exposed to the browser.
-async function getTicketKey(serviceRoleKey: string): Promise<CryptoKey> {
-  const secret = Deno.env.get("CANDIDATE_PORTAL_SIGNING_SECRET") || serviceRoleKey;
-  if (secret.length < 32) throw new Error("Portal ticket secret is not configured securely");
-  const keyBytes = await crypto.subtle.digest(
-    "SHA-256",
-    encoder.encode("tawzeefx:candidate-portal:v1:" + secret),
-  );
-  return crypto.subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, [
-    "encrypt",
-    "decrypt",
-  ]);
-}
-
-async function issueTicket(ticket: PortalTicket, key: CryptoKey): Promise<string> {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ciphertext = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
-    key,
-    encoder.encode(JSON.stringify(ticket)),
-  );
-  const bytes = new Uint8Array(iv.length + ciphertext.byteLength);
-  bytes.set(iv, 0);
-  bytes.set(new Uint8Array(ciphertext), iv.length);
-  return toBase64Url(bytes);
-}
-
-async function validateTicket(rawToken: unknown, key: CryptoKey): Promise<PortalTicket | null> {
-  if (typeof rawToken !== "string" || rawToken.length < 40 || rawToken.length > 2048) {
-    return null;
-  }
-  try {
-    const bytes = fromBase64Url(rawToken);
-    if (bytes.byteLength < 29) return null;
-    const plain = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: bytes.slice(0, 12) },
-      key,
-      bytes.slice(12),
-    );
-    const ticket = JSON.parse(decoder.decode(plain)) as PortalTicket;
-    if (
-      typeof ticket.email !== "string" ||
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ticket.email) ||
-      (ticket.trackingCode !== null && typeof ticket.trackingCode !== "string") ||
-      !Number.isFinite(ticket.expiresAt) ||
-      ticket.expiresAt <= Date.now() ||
-      ticket.expiresAt > Date.now() + PORTAL_TOKEN_TTL_MS
-    ) return null;
-    return ticket;
-  } catch {
-    return null;
-  }
-}
 
 serve(async (req) => {
   const corsHeaders = getExtendedCorsHeaders(req);
@@ -117,7 +38,9 @@ serve(async (req) => {
     if (!supabaseUrl || !serviceRoleKey) throw new Error("Backend is not configured");
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
-    const key = await getTicketKey(serviceRoleKey);
+    const signingSecret = Deno.env.get("CANDIDATE_PORTAL_SIGNING_SECRET");
+    if (!signingSecret) throw new Error("CANDIDATE_PORTAL_SIGNING_SECRET is required");
+    const key = await getCandidatePortalTicketKey(signingSecret);
 
     if (action === "request") {
       const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
@@ -145,7 +68,7 @@ serve(async (req) => {
 
       // Never reveal whether an email or tracking code exists.
       if ((candidateMatches?.length || 0) + (applicationMatches?.length || 0) > 0) {
-        const ticket = await issueTicket({
+        const ticket = await issueCandidatePortalTicket({
           email,
           trackingCode: trackingCode || null,
           expiresAt: Date.now() + PORTAL_TOKEN_TTL_MS,
@@ -176,7 +99,7 @@ serve(async (req) => {
     }
 
     if (action === "read") {
-      const ticket = await validateTicket(body.token, key);
+      const ticket = await validateCandidatePortalTicket(body.token, key);
       if (!ticket) return json({ error: "الرابط غير صالح أو انتهت صلاحيته. اطلب رابطاً جديداً." }, 401, corsHeaders);
 
       let candidatesQuery = supabase.from("candidates")
