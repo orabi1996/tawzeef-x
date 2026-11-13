@@ -28,7 +28,7 @@ describe("Candidate portal security regression", () => {
 
   it("sends protected links only via verified delivery address, not in public responses", () => {
     expect(edge).toContain('action === "request"');
-    expect(edge).toContain('const magicLink = PORTAL_URL + "?access="');
+    expect(edge).toContain('const magicLink = PORTAL_URL + "#access="');
     expect(edge).toContain("GENERIC_EMAIL_MESSAGE");
     expect(edge).toContain("send-email");
     expect(edge).not.toContain("trackingList");
@@ -41,7 +41,8 @@ describe("Candidate portal security regression", () => {
     expect(page).not.toContain("ETEC-9842145-SA");
     expect(page).toContain('action: "read"');
     expect(page).toContain('action: "request"');
-    expect(page).toContain('next.delete("access")');
+    expect(page).toContain('cleanQuery.delete("access")');
+    expect(page).toContain("location.hash");
   });
 
   it("uses centralized CORS rather than wildcard response headers", () => {
