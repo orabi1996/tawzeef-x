@@ -378,12 +378,13 @@ export default function ApplyJob() {
 
     let finalTrackingCode = generatedTrackingCode;
 
-    // 1. Insert into applications table
+    // 1. Persist the public application before displaying a success receipt.
+    // The existing database trigger synchronizes the candidate record.
     try {
       const { error: appErr } = await supabase.from("applications").insert(payload);
       if (appErr) {
         console.warn("Retrying application insert with basic payload:", appErr);
-        await supabase.from("applications").insert({
+        const { error: retryErr } = await supabase.from("applications").insert({
           job_id: id,
           company_id: job?.company_id || null,
           name: form.name.trim(),
@@ -396,9 +397,17 @@ export default function ApplyJob() {
           specialty: form.currentTitle || job?.title || null,
           tracking_code: generatedTrackingCode,
         });
+        if (retryErr) throw retryErr;
       }
-    } catch (e) {
-      console.warn("Applications insert notice:", e);
+    } catch (error) {
+      console.error("Application submission failed:", error);
+      toast({
+        title: "تعذر إرسال طلب التوظيف",
+        description: "لم يتم حفظ الطلب. يرجى المحاولة مرة أخرى.",
+        variant: "destructive",
+      });
+      setSubmitting(false);
+      return;
     }
 
     // 2. Insert or update candidate in Candidates table (non-blocking)
@@ -442,17 +451,7 @@ export default function ApplyJob() {
       console.warn("Direct candidate update notice:", e);
     }
 
-    // 3. Always trigger account creation and AI evaluation
-    supabase.functions.invoke("auto-create-candidate-account", {
-      body: {
-        email: cleanEmail,
-        phone: cleanPhone,
-        name: form.name.trim(),
-        tracking_code: finalTrackingCode,
-        job_title: job?.title,
-      },
-    }).catch(err => console.warn("Auto account creation notice:", err));
-
+    // 3. Candidate tracking now uses a proof-of-email link, not a phone-based password.
     setTrackingCode(finalTrackingCode);
     setSubmitted(true);
     setSubmitting(false);
