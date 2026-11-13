@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircle2, Clock3, ExternalLink, Mail, ShieldCheck } from "lucide-react";
 import tawzeefLogo from "@/assets/tawzeef-x-logo.png";
 import { Button } from "@/components/ui/button";
@@ -44,14 +44,18 @@ async function portalRequest(payload: Record<string, string>) {
 }
 
 export default function CandidatePortal() {
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [trackingCode, setTrackingCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [candidates, setCandidates] = useState<CandidateResult[] | null>(null);
-  const accessToken = params.get("access");
+  // Hash fragments never travel to the server or to referrer headers.
+  // Query-string support only helps with older verification links.
+  const accessToken = new URLSearchParams(location.hash.replace(/^#/, "")).get("access") || params.get("access");
 
   useEffect(() => {
     // Tracking codes are identifiers, not credentials. Never display private
@@ -76,18 +80,20 @@ export default function CandidatePortal() {
         // Clear the bearer link from the address bar after the initial request.
         // This limits accidental sharing, history persistence, and referrer exposure.
         if (!cancelled) {
-          setParams((previous) => {
-            const next = new URLSearchParams(previous);
-            next.delete("access");
-            next.delete("code");
-            next.delete("tracking");
-            return next;
-          }, { replace: true });
+          const cleanQuery = new URLSearchParams(location.search);
+          cleanQuery.delete("access");
+          cleanQuery.delete("code");
+          cleanQuery.delete("tracking");
+          const nextSearch = cleanQuery.toString();
+          navigate(
+            { pathname: location.pathname, search: nextSearch ? "?" + nextSearch : "", hash: "" },
+            { replace: true },
+          );
           setLoading(false);
         }
       });
     return () => { cancelled = true; };
-  }, [accessToken, setParams]);
+  }, [accessToken, navigate, location.pathname, location.search]);
 
   const requestEmail = async () => {
     setError("");
