@@ -14,6 +14,19 @@
 - The frontend supports /portal and the previously broken /candidate-portal alias.
 - Unit tests cover token roundtrip, wrong key, tampering, expiry, malformed tokens and non-deterministic encryption, in addition to source-level security regressions.
 
+## 1A. Additional P0 identity and multi-tenancy safeguards
+
+The expanded source review found high-severity identity/data-isolation patterns beyond the portal itself. The draft PR now also:
+
+- Drops permissive public SELECT-by-tracking-code policies on candidates and applications.
+- Removes legacy policies that allowed **every authenticated account** to access **all companies'** candidate and application records. Restrictive per-company RLS policies use has_company_access(company_id), including verified parent/branch membership.
+- Disallows public calls to auto-create-candidate-account. The function accepts a **service-role token only** and uses an emailed Supabase invitation instead of resetting existing passwords or generating passwords from phone numbers.
+- Removes the public apply-form call to the privileged account-creation function. Existing database trigger handle_new_application is expected to create the candidate row; verify this with an application smoke test.
+- Changes the application receipt and candidate login copy to never suggest a phone number is a password.
+- Replaces the legacy signup trigger's email-substring / untrusted role-metadata admin escalation with role assignment based on job seeker status or a pending, server-managed invitation.
+
+**Important:** Do not assume the stored database is identical to repository migrations. Verify live policies, trigger installation, actual data state and role grants via staging first. Previously created weak-password accounts and unexpectedly elevated user_roles must be reviewed, and affected users may need a forced password reset.
+
 ## 2. Required server secret — BLOCKING
 
 Before deploying the new Edge Function, create a high-entropy signing secret **separate** from the Supabase service-role key. Example of generating one locally:
@@ -28,7 +41,7 @@ Do not place the value in GitHub, frontend VITE_* variables, PR comments or logs
 
 ## 3. Deployment ordering — BLOCKING
 
-The new frontend and Edge Function use a new action-based request format. The old frontend and the new function, or the new frontend and the old function, are **not backward compatible**. Deploy both parts as a coordinated release, preferably after staging validation and with a pre-planned cutover. Do not deploy only one to production.
+The new frontend and candidate-portal Edge Function use a new action-based request format. The old frontend and the new function, or the new frontend and the old function, are **not backward compatible**. The additional anonymous and tenant RLS restrictions, signup trigger, and service-only invitation function must be deployed and verified as a single coordinated security rollout. Deploy both parts as a coordinated release, preferably after staging validation and with a pre-planned cutover. Do not deploy only one to production.
 
 Verify that send-email can be invoked with server-side service-role authorization and that SMTP is configured and delivers messages. Do not send test messages to real candidates.
 
@@ -45,6 +58,13 @@ Verify that send-email can be invoked with server-side service-role authorizatio
 - [ ] Verify token is removed from browser URL after use and responses are non-cacheable.
 - [ ] Confirm legacy /candidate-portal links display the verification page.
 - [ ] Verify anonymous browser requests cannot edit candidate records via the page.
+- [ ] On a staging database, verify a candidate from Company A cannot be read or updated by Company B; test branch access and platform super admin.
+- [ ] Confirm an anonymous Supabase client cannot SELECT candidates or applications, but can still INSERT a legitimate application.
+- [ ] Confirm a self-created account cannot gain admin from role metadata or a similar-looking email.
+- [ ] Confirm the candidate invitation Edge Function rejects anon/user bearer tokens and never returns a password.
+- [ ] Confirm a public job application still creates a candidate through the database trigger and never reports a false success.
+- [ ] Validate that no legitimate recruiter is blocked by missing company_id and that private dashboards still load.
+- [ ] Audit old phone-password accounts and unexpected admin grants; plan remediation and customer communication.
 - [ ] Run npm ci, npx tsc -p tsconfig.app.json --noEmit, npm run test and npm run build.
 - [ ] Smoke test authenticated recruiter/admin dashboard and public job application.
 - [ ] Confirm email delivery and behavior on mobile and desktop.
