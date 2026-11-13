@@ -73,7 +73,8 @@ serve(async (req) => {
           trackingCode: trackingCode || null,
           expiresAt: Date.now() + PORTAL_TOKEN_TTL_MS,
         }, key);
-        const magicLink = PORTAL_URL + "?access=" + encodeURIComponent(ticket);
+        // URL fragments are not included in HTTP requests or Referer headers.
+        const magicLink = PORTAL_URL + "#access=" + encodeURIComponent(ticket);
         const emailResult = await fetch(supabaseUrl + "/functions/v1/send-email", {
           method: "POST",
           headers: {
