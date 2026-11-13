@@ -14,18 +14,13 @@
 - The frontend supports /portal and the previously broken /candidate-portal alias.
 - Unit tests cover token roundtrip, wrong key, tampering, expiry, malformed tokens and non-deterministic encryption, in addition to source-level security regressions.
 
-## 1A. Additional P0 identity and multi-tenancy safeguards
+## 1A. Expanded identity audit, existing database state
 
-The expanded source review found high-severity identity/data-isolation patterns beyond the portal itself. The draft PR now also:
+The source audit also found an unsafe legacy auto-create-candidate-account implementation. This PR removes the public invocation, requires service-role authorization for the function, and switches to Supabase email invitations rather than phone-based passwords or password resets. The candidate receipt and auth page no longer advertise a phone number as a password.
 
-- Drops permissive public SELECT-by-tracking-code policies on candidates and applications.
-- Removes legacy policies that allowed **every authenticated account** to access **all companies'** candidate and application records. Restrictive per-company RLS policies use has_company_access(company_id), including verified parent/branch membership.
-- Disallows public calls to auto-create-candidate-account. The function accepts a **service-role token only** and uses an emailed Supabase invitation instead of resetting existing passwords or generating passwords from phone numbers.
-- Removes the public apply-form call to the privileged account-creation function. Existing database trigger handle_new_application is expected to create the candidate row; verify this with an application smoke test.
-- Changes the application receipt and candidate login copy to never suggest a phone number is a password.
-- Replaces the legacy signup trigger's email-substring / untrusted role-metadata admin escalation with role assignment based on job seeker status or a pending, server-managed invitation.
+**Historical migration caveat:** The repository contains older SQL migrations that describe overly permissive anonymous and authenticated access. A separate read-only comparison recorded in PR #2 indicates that live company-scoped RLS and the signup trigger differ from these obsolete files. Two proposed RLS/signup migrations were therefore removed from this PR. **Do not reapply old SQL or treat repository migration history as a snapshot of the active database.** Tenant isolation, signup grants, and legacy accounts must still be tested in staging.
 
-**Important:** Do not assume the stored database is identical to repository migrations. Verify live policies, trigger installation, actual data state and role grants via staging first. Previously created weak-password accounts and unexpectedly elevated user_roles must be reviewed, and affected users may need a forced password reset.
+The existing application INSERT trigger is expected to sync application and candidate records. This behavior must be verified with test applications before rollout. Existing accounts previously assigned a phone-derived password should be reviewed for remediation.
 
 ## 2. Required server secret — BLOCKING
 
@@ -41,7 +36,7 @@ Do not place the value in GitHub, frontend VITE_* variables, PR comments or logs
 
 ## 3. Deployment ordering — BLOCKING
 
-The new frontend and candidate-portal Edge Function use a new action-based request format. The old frontend and the new function, or the new frontend and the old function, are **not backward compatible**. The additional anonymous and tenant RLS restrictions, signup trigger, and service-only invitation function must be deployed and verified as a single coordinated security rollout. Deploy both parts as a coordinated release, preferably after staging validation and with a pre-planned cutover. Do not deploy only one to production.
+The new frontend and candidate-portal Edge Function use a new action-based request format. The old frontend and the new function, or the new frontend and the old function, are **not backward compatible**. The service-only invitation function must be deployed as part of the coordinated rollout. No new SQL migrations are included in this PR; verify the active database policies instead. Deploy both parts as a coordinated release, preferably after staging validation and with a pre-planned cutover. Do not deploy only one to production.
 
 Verify that send-email can be invoked with server-side service-role authorization and that SMTP is configured and delivers messages. Do not send test messages to real candidates.
 
