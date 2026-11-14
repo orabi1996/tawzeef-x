@@ -107,6 +107,7 @@ function AnimatedRoutes() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/apply/:id" element={<ApplyJob />} />
         <Route path="/portal" element={<CandidatePortal />} />
+        <Route path="/candidate-portal" element={<CandidatePortal />} />
         <Route path="/book/:candidateId" element={<BookInterview />} />
         <Route path="/offer/:token" element={<OfferPortal />} />
         <Route path="/onboard/:orderId" element={<OrderOnboardingPortal />} />
