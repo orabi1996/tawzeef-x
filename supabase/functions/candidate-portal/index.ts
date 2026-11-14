@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getExtendedCorsHeaders } from "../_shared/cors.ts";
 
 const json = (body: unknown, status: number, headers: Record<string, string>) =>
-  new Response(JSON.stringify(body), { status, headers: { ...headers, "Content-Type": "application/json" } });
+  new Response(JSON.stringify(body), { status, headers: { ...headers, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer" } });
 
 const escapeHtml = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, (c) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
