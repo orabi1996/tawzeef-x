@@ -1216,7 +1216,7 @@ const AuthForm = memo(function AuthForm({ isLogin, setIsLogin, setPendingOtp }: 
                 </h2>
                 <p className="text-slate-500 text-xs leading-normal">
                   {searchParams.get("role") === "candidate" 
-                    ? "أدخل بريدك الإلكتروني ورقم جوالك ككلمة مرور لمتابعة طلبك"
+                    ? "لمتابعة طلب التوظيف استخدم رابط التحقق عبر بريدك الإلكتروني، أو سجّل دخولك بكلمة مرور آمنة سبق إعدادها."
                     : isLogin 
                     ? "أدخل بريدك الإلكتروني وكلمة المرور للوصول لحسابك" 
                     : "ابدأ رحلتك في التوظيف الذكي وتتبع المرشحين"}
@@ -1225,10 +1225,10 @@ const AuthForm = memo(function AuthForm({ isLogin, setIsLogin, setPendingOtp }: 
                   <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 text-right space-y-1 my-2">
                     <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold text-xs">
                       <User className="w-4 h-4" />
-                      <span>حساب متقدم مُنشأ تلقائياً 👤✨</span>
+                      <span>متابعة الطلب برابط تحقق آمن 🔐</span>
                     </div>
                     <p className="text-[11px] text-muted-foreground">
-                      كلمة المرور الخاصة بك هي <strong className="text-foreground">رقم الجوال</strong> الذي أدخلته عند تقديم الطلب.
+                      لا يتم إنشاء كلمة مرور من رقم الجوال. انتقل إلى <a href="/portal" className="font-bold text-primary underline">بوابة متابعة الطلبات</a> للحصول على رابط عبر بريدك. إذا كان حسابك القديم يستخدم رقم الجوال ككلمة مرور، غيّرها من <a href="/forgot-password" className="font-bold text-primary underline">استعادة كلمة المرور</a>.
                     </p>
                   </div>
                 )}

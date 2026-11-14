@@ -1,204 +1,62 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 
+// P0: Never create or reset passwords from an applicant's phone number.
+// This function is only for trusted service-to-service invitations.
+// The public job application process writes the application and uses
+// the email-verified candidate portal; it must never invoke this endpoint.
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+  const json = (body: Record<string, unknown>, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+      },
+    });
+
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const bearer = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+
+  // Having a valid anon or ordinary user JWT is NOT enough: privileged
+  // auth.admin operations are only available to a trusted backend worker.
+  if (!serviceKey || !supabaseUrl || bearer !== serviceKey) {
+    return json({ error: "Unauthorized" }, 401);
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey);
+    const body = await req.json() as Record<string, unknown>;
+    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    const name = typeof body.name === "string" ? body.name.trim().slice(0, 200) : "";
 
-    const { email, phone, password, name, user_type, tracking_code, job_title } = await req.json();
-
-    if (!email || (!phone && !password)) {
-      return new Response(
-        JSON.stringify({ error: "البريد الإلكتروني وكلمة المرور أو رقم الجوال مطلوبان لإتمام إنشاء الحساب" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return json({ error: "Invalid email" }, 400);
     }
 
-    const cleanEmail = String(email).trim().toLowerCase();
-    
-    // Determine password: if explicit password provided (e.g. for agency), use it directly! Otherwise use clean phone.
-    let cleanPassword = password ? String(password) : "";
-    if (!cleanPassword) {
-      let rawPhone = String(phone).trim().replace(/\D/g, "");
-      if (rawPhone.length < 6) {
-        rawPhone = (rawPhone + "123456").slice(0, 8);
-      }
-      cleanPassword = rawPhone;
+    const admin = createClient(supabaseUrl, serviceKey);
+    // Invite rather than setting a server-known password. The invited person
+    // establishes their own credentials via Supabase's emailed auth flow.
+    // Ignore caller-supplied role, account type, password, and phone fields.
+    const { error } = await admin.auth.admin.inviteUserByEmail(email, {
+      data: {
+        full_name: name || email.split("@")[0],
+        account_type: "job_seeker",
+        role: "job_seeker",
+      },
+    });
+    if (error) {
+      console.error("Candidate secure invitation failed:", error.message);
+      return json({ error: "Could not send candidate invitation" }, 409);
     }
-
-    const targetUserType = user_type || "candidate";
-    const targetRole = user_type === "agency" ? "recruiter" : "candidate";
-
-    // Check if user already exists
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(u => u.email?.toLowerCase() === cleanEmail);
-
-    let userId: string;
-    let isNewAccount = false;
-
-    if (existingUser) {
-      userId = existingUser.id;
-      console.log(`User ${cleanEmail} already exists (${userId}). Updating password and metadata...`);
-      await supabaseAdmin.auth.admin.updateUserById(userId, {
-        password: cleanPassword,
-        email_confirm: true,
-        user_metadata: {
-          ...existingUser.user_metadata,
-          full_name: name || existingUser.user_metadata?.full_name,
-          phone: phone || existingUser.user_metadata?.phone,
-          user_type: targetUserType,
-          role: targetRole,
-        },
-      });
-    } else {
-      isNewAccount = true;
-      console.log(`Creating new account for ${cleanEmail} (type: ${targetUserType})...`);
-      const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-        email: cleanEmail,
-        password: cleanPassword,
-        email_confirm: true,
-        user_metadata: {
-          full_name: name || cleanEmail.split("@")[0],
-          phone: phone || "",
-          user_type: targetUserType,
-          role: targetRole,
-          tracking_code: tracking_code || "",
-        },
-      });
-
-      if (createErr || !newUser.user) {
-        throw new Error(createErr?.message || "فشل إنشاء الحساب");
-      }
-
-      userId = newUser.user.id;
-    }
-
-    // Ensure candidate profile exists in profiles table
-    try {
-      await supabaseAdmin.from("profiles").upsert({
-        id: userId,
-        email: cleanEmail,
-        full_name: name || cleanEmail.split("@")[0],
-        phone: phone,
-        role: "candidate",
-        updated_at: new Date().toISOString(),
-      });
-    } catch (profileErr) {
-      console.warn("Profiles upsert warning:", profileErr);
-    }
-
-    // Ensure candidate row exists in candidates table
-    if (cleanEmail) {
-      try {
-        const { data: existingCand } = await supabaseAdmin
-          .from("candidates")
-          .select("id")
-          .eq("email", cleanEmail)
-          .maybeSingle();
-
-        if (existingCand) {
-          await supabaseAdmin
-            .from("candidates")
-            .update({ user_id: userId, tracking_code: tracking_code || undefined })
-            .eq("id", existingCand.id);
-        } else {
-          // Look up latest application
-          const { data: latestApp } = await supabaseAdmin
-            .from("applications")
-            .select("*, jobs(title, user_id, company_id)")
-            .eq("email", cleanEmail)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (latestApp) {
-            await supabaseAdmin.from("candidates").insert({
-              id: latestApp.id,
-              user_id: latestApp.jobs?.user_id || userId,
-              company_id: latestApp.company_id || latestApp.jobs?.company_id || null,
-              job_id: latestApp.job_id,
-              name: latestApp.name || name,
-              email: cleanEmail,
-              phone: phone || latestApp.phone,
-              role: latestApp.jobs?.title || job_title || latestApp.specialty || "متقدم جديد",
-              stage: "تقديم الطلب",
-              status: "قيد المراجعة",
-              tracking_code: tracking_code || latestApp.tracking_code || null,
-              experience: latestApp.experience || null,
-              resume_url: latestApp.resume_url || null,
-              skills: latestApp.skills || null,
-              summary: latestApp.cover_letter || null,
-              source: "رابط التقديم المباشر",
-              license_number: latestApp.license_number || null,
-              license_expiry: latestApp.license_expiry || null,
-              university_degree: latestApp.university_degree || null,
-              demo_video_url: latestApp.demo_video_url || null,
-            });
-          }
-        }
-      } catch (candErr) {
-        console.warn("Candidates sync in auto-create-account notice:", candErr);
-      }
-    }
-
-    // If new account, trigger candidate welcome email via send-email
-    if (isNewAccount) {
-      try {
-        await fetch(`${supabaseUrl}/functions/v1/send-email`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${serviceKey}`,
-          },
-          body: JSON.stringify({
-            to: cleanEmail,
-            subject: `تم إنشاء حسابك بنجاح لتتبع طلبك - Tawzeef-X`,
-            html: `
-              <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0;">
-                <div style="text-align: center; margin-bottom: 24px;">
-                  <h1 style="color: #0d5c5a; margin: 0; font-size: 24px;">مرحباً بك في Tawzeef-X 🎉</h1>
-                  <p style="color: #64748b; font-size: 14px; margin-top: 6px;">تم إرسال طلبك للوظيفة <strong>${job_title || ""}</strong> وإنشاء حسابك المباشر بنجاح.</p>
-                </div>
-                
-                <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 20px; margin: 20px 0;">
-                  <h3 style="margin-top: 0; color: #1e293b; font-size: 16px;">بيانات دخول حسابك لتتبع الطلب:</h3>
-                  <p style="margin: 8px 0; font-size: 14px;"><strong>البريد الإلكتروني:</strong> <span dir="ltr">${cleanEmail}</span></p>
-                  <p style="margin: 8px 0; font-size: 14px;"><strong>كلمة المرور:</strong> <span dir="ltr">${phone}</span> (رقم جوالك)</p>
-                  ${tracking_code ? `<p style="margin: 8px 0; font-size: 14px;"><strong>رقم تتبع الطلب المرجعي:</strong> <code>${tracking_code}</code></p>` : ""}
-                </div>
-
-                <p style="color: #475569; font-size: 13px; text-align: center; margin-top: 24px;">يمكنك الآن دخول بوابة المتقدمين لمتابعة حالة الطلب وتحديث ملفك الشخصي في أي وقت.</p>
-              </div>
-            `,
-          }),
-        });
-      } catch (emailErr) {
-        console.warn("Failed sending welcome email:", emailErr);
-      }
-    }
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        is_new_account: isNewAccount,
-        user_id: userId,
-        email: cleanEmail,
-        password: cleanPassword,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  } catch (err: any) {
-    console.error("auto-create-candidate-account error:", err);
-    return new Response(
-      JSON.stringify({ error: err.message || "حدث خطأ أثناء إنشاء حساب المتقدم" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return json({ success: true, invitation_sent: true });
+  } catch (error) {
+    console.error("Candidate invitation request failed", error);
+    return json({ error: "Unable to complete invitation" }, 500);
   }
 });

@@ -6,6 +6,9 @@ verify_jwt = true
 [functions.evaluate-candidate]
 verify_jwt = true
 
+[functions.auto-create-candidate-account]
+verify_jwt = true
+
 [functions.candidate-portal]
 verify_jwt = false
 

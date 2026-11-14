@@ -143,15 +143,18 @@ export default function ApplySuccessPass({
               </Button>
             </div>
 
-            {/* Candidate Portal Access Details */}
+            {/* Email-verification access instructions: no phone-based passwords */}
             {applicantEmail && (
-              <div className="p-4 rounded-2xl bg-muted/40 border border-border/50 text-xs space-y-2 font-mono" dir="ltr">
-                <div className="flex items-center justify-between text-[11px] font-sans text-muted-foreground border-b border-border/30 pb-1.5" dir="rtl">
-                  <span className="font-bold text-foreground">بيانات الدخول لبوابة المرشح:</span>
-                  <Badge variant="outline" className="text-[10px]">محدث تلقائياً</Badge>
+              <div className="p-4 rounded-2xl bg-muted/40 border border-border/50 text-xs space-y-2" dir="rtl">
+                <div className="flex items-center justify-between gap-2 text-[11px] border-b border-border/30 pb-1.5">
+                  <span className="font-bold text-foreground">متابعة الطلب بشكل آمن</span>
+                  <Badge variant="outline" className="text-[10px]">تأكيد البريد الإلكتروني</Badge>
                 </div>
-                <p className="text-left"><strong className="text-foreground font-sans">البريد:</strong> {applicantEmail}</p>
-                <p className="text-left"><strong className="text-foreground font-sans">كلمة المرور المؤقتة:</strong> {applicantPhone} <span className="text-[10px] text-muted-foreground font-sans">(رقم جوالك)</span></p>
+                <p className="text-muted-foreground">البريد المرتبط بالطلب: <strong dir="ltr">{applicantEmail}</strong></p>
+                <p className="text-muted-foreground leading-relaxed">
+                  افتح بوابة متابعة الطلبات وأدخل بريدك الإلكتروني للحصول على رابط آمن.
+                  لا يتم إنشاء كلمة مرور تلقائياً من رقم الجوال.
+                </p>
               </div>
             )}
 
