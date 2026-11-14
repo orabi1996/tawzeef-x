@@ -7,6 +7,7 @@ const source = (filename: string) => readFileSync(resolve(process.cwd(), filenam
 describe("Candidate portal production compatibility and privacy", () => {
   const edge = source("supabase/functions/candidate-portal/index.ts");
   const routes = source("src/App.tsx");
+  const registry = source("src/lib/permissionsRegistry.ts");
   const apply = source("src/pages/ApplyJob.tsx");
 
   it("prevents caching private candidate information from the portal API", () => {
@@ -34,5 +35,6 @@ describe("Candidate portal production compatibility and privacy", () => {
   it("preserves the canonical and older candidate portal links", () => {
     expect(routes).toContain('<Route path="/portal" element={<CandidatePortal />} />');
     expect(routes).toContain('<Route path="/candidate-portal" element={<CandidatePortal />} />');
+    expect(registry).toContain('"/candidate-portal"');
   });
 });
