@@ -24,7 +24,7 @@ export default function Contact() {
         `Name: ${form.name}\nCompany: ${form.company}\nEmail: ${form.email}\n\n${form.message}`
       );
       const subject = encodeURIComponent(form.subject || "Tawzeef-X inquiry");
-      window.location.href = `mailto:support@tawzeef-x.com?subject=${subject}&body=${body}`;
+      window.location.href = `mailto:tawzeefx@outlook.com?subject=${subject}&body=${body}`;
       await new Promise((r) => setTimeout(r, 600));
       setSubmitted(true);
       toast.success(t("contact.form.success"));
@@ -37,7 +37,7 @@ export default function Contact() {
   };
 
   const info = [
-    { icon: Mail, title: t("contact.info.email"), value: "support@tawzeef-x.com", href: "mailto:support@tawzeef-x.com" },
+    { icon: Mail, title: t("contact.info.email"), value: "tawzeefx@outlook.com", href: "mailto:tawzeefx@outlook.com" },
     { icon: Phone, title: t("contact.info.phone"), value: "+966 50 000 0000", href: "tel:+966500000000" },
     { icon: MapPin, title: t("contact.info.location"), value: t("contact.info.locationValue") },
     { icon: Clock, title: t("contact.info.hours"), value: t("contact.info.hoursValue") },
