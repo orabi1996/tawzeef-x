@@ -46,7 +46,7 @@ export default function QuoteRequestDialog({ plan, onClose }: QuoteRequestDialog
     ].join("\n");
 
     const subject = encodeURIComponent(`طلب عرض سعر - ${plan.name_ar || plan.name}`);
-    window.location.href = `mailto:support@tawzeef-x.com?subject=${subject}&body=${encodeURIComponent(body)}`;
+    window.location.href = `mailto:tawzeefx@outlook.com?subject=${subject}&body=${encodeURIComponent(body)}`;
   };
 
   return (
