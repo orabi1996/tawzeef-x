@@ -1264,16 +1264,7 @@ export default function LandingPage() {
                         {isFree ? (
                           <span className="text-4xl font-black">مجاناً</span>
                         ) : (
-                          <>
-                            <span className="text-4xl font-black font-mono">{plan.price}</span>
-                            <span
-                              className={`text-xs font-bold ${
-                                isPro ? "text-md-on-primary/80" : "text-md-on-surface-variant"
-                              }`}
-                            >
-                              {plan.currency === "SAR" ? "ر.س / شهر" : `${plan.currency} / شهر`}
-                            </span>
-                          </>
+                          <span className="text-2xl font-black leading-tight">عرض سعر عند الطلب</span>
                         )}
                       </div>
 
@@ -1467,7 +1458,7 @@ export default function LandingPage() {
                   تسجيل منشأة جديدة
                 </Link>
                 <div className="pt-2 text-xs text-md-on-surface-variant">
-                  الدعم الفني: support@tawzeef-x.com
+                  الدعم الفني: tawzeefx@outlook.com
                 </div>
               </div>
             </div>
