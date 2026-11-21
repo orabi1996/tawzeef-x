@@ -8,6 +8,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserRole } from "@/hooks/useUserRole";
 import CheckoutModal from "@/components/CheckoutModal";
+import QuoteRequestDialog from "@/components/marketing/QuoteRequestDialog";
 import { SEO } from "@/components/marketing/SEO";
 import { useState } from "react";
 
@@ -27,6 +28,7 @@ export default function Pricing() {
   const { data: plans, isLoading } = useSubscriptionPlans();
   const { user } = useAuth();
   const { role } = useUserRole();
+  const [quotePlan, setQuotePlan] = useState<{ name: string; name_ar: string; price: number; currency: string; job_posts_limit: number } | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<{
     id: string;
     name: string;
@@ -124,14 +126,9 @@ export default function Pricing() {
 
                   <div className="mb-6">
                     <div className="flex items-baseline gap-1">
-                      <span className="text-4xl font-black text-foreground" style={{ fontFamily: "'Cairo', sans-serif" }}>
-                        {plan.price === 0 ? "مجاني" : plan.price}
+                      <span className={`${plan.price === 0 ? "text-4xl" : "text-2xl"} font-black text-foreground`} style={{ fontFamily: "'Cairo', sans-serif" }}>
+                        {plan.price === 0 ? "مجاني" : "عرض سعر عند الطلب"}
                       </span>
-                      {plan.price > 0 && (
-                        <span className="text-sm text-muted-foreground" style={{ fontFamily: "'Cairo', sans-serif" }}>
-                          {plan.currency} / شهرياً
-                        </span>
-                      )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1" style={{ fontFamily: "'Cairo', sans-serif" }}>
                       {plan.job_posts_limit === -1 ? "منشورات غير محدودة" : `${plan.job_posts_limit} منشور توظيف`}
@@ -147,14 +144,14 @@ export default function Pricing() {
                     ))}
                   </ul>
 
-                  {user && (role === "recruiter" || role === "admin" || role === "super_admin") ? (
+                  {plan.price > 0 ? (
                     <Button
-                      onClick={() => setSelectedPlan({
-                        id: plan.id,
+                      onClick={() => setQuotePlan({
                         name: plan.name,
-                        name_ar: plan.name_ar,
+                        name_ar: plan.name_ar || plan.name,
                         price: plan.price,
-                        limit: plan.job_posts_limit
+                        currency: plan.currency,
+                        job_posts_limit: plan.job_posts_limit,
                       })}
                       className={`w-full h-12 rounded-xl text-sm font-bold ${
                         isPro
@@ -166,22 +163,27 @@ export default function Pricing() {
                       variant={isPro || isBasic ? "default" : "outline"}
                       style={{ fontFamily: "'Cairo', sans-serif" }}
                     >
-                      {plan.price === 0 ? "الباقة الحالية" : "طلب ترقية الباقة 🚀"}
+                      طلب عرض سعر
+                    </Button>
+                  ) : user && (role === "recruiter" || role === "admin" || role === "super_admin") ? (
+                    <Button
+                      onClick={() => setSelectedPlan({
+                        id: plan.id,
+                        name: plan.name,
+                        name_ar: plan.name_ar,
+                        price: plan.price,
+                        limit: plan.job_posts_limit
+                      })}
+                      className="w-full h-12 rounded-xl text-sm font-bold"
+                      variant="outline"
+                      style={{ fontFamily: "'Cairo', sans-serif" }}
+                    >
+                      الباقة الحالية
                     </Button>
                   ) : (
                     <Link to={`/auth?mode=signup&plan=${plan.name}`}>
-                      <Button
-                        className={`w-full h-12 rounded-xl text-sm font-bold ${
-                          isPro
-                            ? "bg-primary hover:bg-primary/90 text-primary-foreground"
-                            : isBasic
-                            ? "bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20"
-                            : ""
-                        }`}
-                        variant={isPro || isBasic ? "default" : "outline"}
-                        style={{ fontFamily: "'Cairo', sans-serif" }}
-                      >
-                        {plan.price === 0 ? "ابدأ مجاناً" : "اشترك الآن"}
+                      <Button className="w-full h-12 rounded-xl text-sm font-bold" variant="outline" style={{ fontFamily: "'Cairo', sans-serif" }}>
+                        ابدأ مجاناً
                       </Button>
                     </Link>
                   )}
@@ -206,6 +208,8 @@ export default function Pricing() {
           </p>
         </motion.div>
       </div>
+
+      <QuoteRequestDialog plan={quotePlan} onClose={() => setQuotePlan(null)} />
 
       {selectedPlan && (
         <CheckoutModal
