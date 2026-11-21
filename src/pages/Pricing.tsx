@@ -200,7 +200,7 @@ export default function Pricing() {
         >
           <p className="text-muted-foreground text-sm" style={{ fontFamily: "'Cairo', sans-serif" }}>
             تحتاج باقة مخصصة بحدود خاصة؟{" "}
-            <a href="mailto:support@tawzeef-x.com" className="text-primary font-semibold hover:underline">
+            <a href="mailto:tawzeefx@outlook.com" className="text-primary font-semibold hover:underline">
               تواصل مع فريق إدارة Tawzeef-X
             </a>
           </p>
