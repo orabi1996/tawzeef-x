@@ -219,8 +219,8 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-md-surface text-md-on-surface overflow-x-hidden w-full max-w-full font-sans antialiased selection:bg-md-primary selection:text-md-on-primary" dir="rtl">
       <SEO
-        title="TawzeefX | وظائف وفرص عمل ومنصة توظيف ذكية"
-        description="اكتشف أحدث الوظائف وفرص العمل مع TawzeefX، منصة توظيف ذكية تساعد الباحثين عن عمل على الوصول للفرص المناسبة وتساعد الشركات على العثور على أفضل المرشحين."
+        title="TawzeefX | منصة ذكية لإدارة التوظيف للشركات"
+        description="أدر دورة التوظيف في منشأتك عبر TawzeefX: انشر الوظائف، وتابع المرشحين، ونظّم المقابلات والتقارير بواجهة عربية وإنجليزية."
         canonical="https://www.tawzeefx.com/"
         image="https://www.tawzeefx.com/icon-512x512.png"
         jsonLd={{
@@ -232,14 +232,14 @@ export default function LandingPage() {
               "name": "TawzeefX",
               "url": "https://www.tawzeefx.com/",
               "logo": "https://www.tawzeefx.com/icon-512x512.png",
-              "description": "منصة توظيف ذكية تربط الباحثين عن عمل بالشركات وأصحاب الأعمال لاكتشاف أحدث الوظائف واستقطاب أفضل الكفاءات."
+              "description": "منصة ذكية تساعد فرق الموارد البشرية على إدارة الوظائف والمرشحين والمقابلات في مكان واحد."
             },
             {
               "@type": "WebSite",
               "@id": "https://www.tawzeefx.com/#website",
               "url": "https://www.tawzeefx.com/",
               "name": "TawzeefX",
-              "description": "منصة توظيف ذكية للباحثين عن عمل والشركات",
+              "description": "منصة عربية وإنجليزية لإدارة التوظيف للشركات وفرق الموارد البشرية",
               "publisher": {
                 "@id": "https://www.tawzeefx.com/#organization"
               },
@@ -275,7 +275,7 @@ export default function LandingPage() {
               { label: "الوظائف الشاغرة", href: "/careers" },
               { label: "المميزات والحلول", href: "#features" },
               { label: "معاينة النظام الحي", href: "#showcase" },
-              { label: "باقات المنشآت", href: "#pricing" },
+              { label: "طلب عرض سعر", href: "#pricing" },
               { label: "الأمان والموثوقية", href: "#security" },
             ].map((item) => (
               <a
@@ -304,7 +304,7 @@ export default function LandingPage() {
               تسجيل الدخول
             </Link>
             <Link
-              to="/auth?mode=signup"
+              to="#pricing"
               className="bg-md-primary text-md-on-primary text-md3-label-lg font-bold px-6 py-2.5 rounded-md3-full shadow-md3-1 hover:shadow-md3-3 transition-all hover:scale-105"
             >
               ابدأ مجاناً
@@ -350,7 +350,7 @@ export default function LandingPage() {
                 { label: "الوظائف الشاغرة", href: "/careers" },
                 { label: "المميزات والحلول", href: "#features" },
                 { label: "معاينة النظام الحي", href: "#showcase" },
-                { label: "باقات المنشآت", href: "#pricing" },
+                { label: "طلب عرض سعر", href: "#pricing" },
                 { label: "الأمان والموثوقية", href: "#security" },
               ].map((item) => (
                 <a
@@ -373,7 +373,7 @@ export default function LandingPage() {
                 تسجيل الدخول
               </Link>
               <Link
-                to="/auth?mode=signup"
+                to="#pricing"
                 onClick={() => setMobileMenuOpen(false)}
                 className="w-full py-3.5 text-center rounded-md3-full bg-md-primary text-md-on-primary font-bold shadow-md3-2"
               >
@@ -415,9 +415,9 @@ export default function LandingPage() {
                 variants={fadeUp}
                 className="text-4xl sm:text-5xl lg:text-[54px] font-black leading-[1.22] text-md-on-surface mb-6 tracking-normal"
               >
-                منصة توظيف ذكية للباحثين عن عمل والشركات <br />
+                منصة ذكية لإدارة التوظيف في منشأتك <br />
                 <span className="text-md-primary relative inline-block">
-                  Smart Recruitment &amp; Job Search Platform
+                  Smart Recruitment Management Platform
                   <span className="absolute left-0 bottom-1 w-full h-2.5 bg-md-primary-container/60 -z-10 rounded-full" />
                 </span>
               </motion.h1>
@@ -426,7 +426,7 @@ export default function LandingPage() {
                 variants={fadeUp}
                 className="text-md3-body-lg text-md-on-surface-variant max-w-xl mx-auto lg:mx-0 mb-8 leading-relaxed font-medium"
               >
-                منظومة توظيف سحابية ذكية: تصفح أحدث الوظائف وفرص العمل المعتمدة، وفرز السير الذاتية بالذكاء الاصطناعي، ومقابلات الفيديو المدمجة، وإدارة استقطاب الكفاءات للشركات بكل سهولة.
+                أدر دورة التوظيف في مكان واحد: أنشئ الوظائف، وتابع المرشحين، ونظّم المقابلات، وراجع مؤشرات التوظيف بواجهة عربية وإنجليزية وأدوات مساعدة بالذكاء الاصطناعي.
               </motion.p>
 
               {/* CTAs */}
@@ -435,19 +435,19 @@ export default function LandingPage() {
                 className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start mb-8"
               >
                 <Link
-                  to="/careers"
+                  to="#showcase"
                   className="w-full sm:w-auto bg-md-primary text-md-on-primary rounded-md3-full h-14 px-9 text-md3-title-sm font-bold flex items-center justify-center gap-2.5 shadow-md3-2 hover:shadow-md3-4 hover:scale-105 transition-all"
                 >
                   <Briefcase className="w-4 h-4" />
-                  <span>تصفح أحدث الوظائف</span>
+                  <span>شاهد معاينة المنصة</span>
                 </Link>
 
                 <Link
-                  to="/auth?mode=signup"
+                  to="#pricing"
                   className="w-full sm:w-auto bg-md-secondary-container text-md-on-secondary-container rounded-md3-full h-14 px-8 text-md3-title-sm font-bold flex items-center justify-center gap-2 hover:bg-md-secondary-container/80 transition-all border border-md-outline-variant/80"
                 >
                   <Building2 className="w-4 h-4" />
-                  <span>انضم كصاحب عمل وابدأ التوظيف</span>
+                  <span>اطلب عرض سعر</span>
                 </Link>
               </motion.div>
 
@@ -1197,13 +1197,13 @@ export default function LandingPage() {
           <div className="text-center max-w-2xl mx-auto mb-16">
             <div className="inline-flex items-center gap-2 bg-md-primary-container text-md-on-primary-container text-xs font-black px-4 py-1.5 rounded-md3-full mb-4">
               <Database className="w-3.5 h-3.5" />
-              <span>الباقات المعتمدة والمحدثة بالنظام</span>
+              <span>حلول توظيف مرنة للمنشآت</span>
             </div>
             <h2 className="text-3xl sm:text-4xl font-black text-md-on-surface mb-4">
-              باقات اشتراك مرنة تناسب حجم كل منشأة
+              حلول مرنة تناسب حجم واحتياج كل منشأة
             </h2>
             <p className="text-md3-body-md text-md-on-surface-variant">
-              الأسعار والميزات تتزامن مباشرة مع قاعدة بيانات المنصة لضمان دقة التعاقد والمزايا
+              تعرّف على مزايا TawzeefX، ثم أرسل طلب عرض سعر ليتواصل معك الفريق عبر البريد أو الجوال.
             </p>
           </div>
 
@@ -1296,7 +1296,7 @@ export default function LandingPage() {
 
                     {isFree ? (
                       <Link
-                        to="/auth?mode=signup"
+                        to="#pricing"
                         className="w-full py-3.5 rounded-md3-full font-bold text-center text-sm transition-transform hover:scale-105 shadow-sm bg-md-primary text-md-on-primary"
                       >
                         ابدأ الاستخدام المجاني
@@ -1358,7 +1358,7 @@ export default function LandingPage() {
               </div>
               <div className="lg:col-span-4 flex justify-center lg:justify-end">
                 <Link
-                  to="/auth?mode=signup"
+                  to="#pricing"
                   className="bg-md-primary text-md-on-primary rounded-md3-full px-8 py-4 text-sm font-bold shadow-md3-2 hover:shadow-md3-4 hover:scale-105 transition-all text-center"
                 >
                   إنشاء حساب مسؤولي المنشأة
@@ -1382,7 +1382,7 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
-                to="/auth?mode=signup"
+                to="#pricing"
                 className="w-full sm:w-auto bg-md-primary text-md-on-primary rounded-md3-full h-14 px-10 text-md3-title-sm font-bold flex items-center justify-center gap-2 shadow-md3-2 hover:shadow-md3-4 hover:scale-105 transition-all"
               >
                 <span>إنشاء حساب والبدء فوراً</span>
@@ -1452,7 +1452,7 @@ export default function LandingPage() {
                   دخول لوحة تحكم المنشأة ←
                 </Link>
                 <Link
-                  to="/auth?mode=signup"
+                  to="#pricing"
                   className="block text-md-on-surface hover:text-md-primary transition-colors"
                 >
                   تسجيل منشأة جديدة
