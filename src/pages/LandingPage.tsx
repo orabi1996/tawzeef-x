@@ -558,7 +558,7 @@ export default function LandingPage() {
                   </div>
                   <div>
                     <div className="text-[10px] text-md-on-surface-variant font-bold">فحص السير الذاتية</div>
-                    <div className="text-xs font-black text-md-primary">تطابق جدارات 96%</div>
+                    <div className="text-xs font-black text-md-primary">عرض توضيحي لفرز المرشحين</div>
                   </div>
                 </motion.div>
 
@@ -572,8 +572,8 @@ export default function LandingPage() {
                     <CheckCircle2 className="w-4 h-4" />
                   </div>
                   <div>
-                    <div className="text-[10px] text-md-on-surface-variant font-bold">العروض الموقعة</div>
-                    <div className="text-xs font-black text-emerald-600 dark:text-emerald-400">توقيع رقمي موثق</div>
+                    <div className="text-[10px] text-md-on-surface-variant font-bold">حالة العرض الوظيفي</div>
+                    <div className="text-xs font-black text-emerald-600 dark:text-emerald-400">متابعة حالة العرض</div>
                   </div>
                 </motion.div>
               </div>
@@ -590,18 +590,18 @@ export default function LandingPage() {
               <div className="w-3 h-3 rounded-full bg-emerald-500 animate-ping" />
               <div>
                 <h3 className="text-md3-title-md font-black text-md-on-surface flex items-center gap-2">
-                  <span>إحصائيات ومؤشرات النظام الحية</span>
+                  <span>مؤشرات Tawzeef-X</span>
                   <span className="text-xs font-normal text-md-primary bg-md-primary-container px-2.5 py-0.5 rounded-md3-full font-mono">
-                    Live Database Telemetry
+                    Platform Metrics
                   </span>
                 </h3>
                 <p className="text-xs text-md-on-surface-variant">
-                  قراءات حقيقية تعكس حركة الاستقطاب والمعالجة النشطة في منصة Tawzeef-X
+                  تعرض هذه المؤشرات أعداد الوظائف والمرشحين والمقابلات المسجلة على المنصة.
                 </p>
               </div>
             </div>
             <div className="text-xs text-md-on-surface-variant font-mono bg-md-surface px-3 py-1.5 rounded-md3-md border border-md-outline-variant">
-              حالة الخوادم: متصلة ونشطة • التشفير: مفعل
+              تُحمَّل الأعداد من بيانات المنصة المتاحة.
             </div>
           </div>
 
@@ -955,7 +955,7 @@ export default function LandingPage() {
                   <div className="md:col-span-5 bg-md-surface rounded-md3-xl p-5 border border-md-outline-variant space-y-4">
                     <h4 className="text-xs font-black text-md-on-surface flex items-center gap-2">
                       <Volume2 className="w-4 h-4 text-md-primary" />
-                      <span>التفريغ النصي التلقائي (ElevenLabs AI):</span>
+                      <span>نموذج توضيحي للتفريغ النصي:</span>
                     </h4>
 
                     <div className="space-y-3 text-xs leading-relaxed max-h-[190px] overflow-y-auto">
@@ -970,8 +970,8 @@ export default function LandingPage() {
                     </div>
 
                     <div className="flex items-center justify-between text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-md3-sm">
-                      <span>مؤشر التقييم الفوري: ممتاز</span>
-                      <span>+92% توافق</span>
+                      <span>مثال توضيحي لنتيجة التقييم</span>
+                      <span>نسبة توافق توضيحية</span>
                     </div>
                   </div>
                 </div>
