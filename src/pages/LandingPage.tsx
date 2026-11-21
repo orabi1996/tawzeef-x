@@ -15,8 +15,6 @@ import { useRef, useState, useEffect } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
 import { SEO } from "@/components/marketing/SEO";
-import { useSubscriptionPlans } from "@/hooks/useSubscription";
-import QuoteRequestDialog from "@/components/marketing/QuoteRequestDialog";
 
 // --- System Showcase Modules ---
 const SYSTEM_MODULES = [
@@ -174,8 +172,6 @@ export default function LandingPage() {
   });
 
   const [realCompanies, setRealCompanies] = useState<Array<{ id: string; name: string; logo_url: string | null }>>([]);
-  const { data: dbPlans, isLoading: plansLoading } = useSubscriptionPlans();
-  const [quotePlan, setQuotePlan] = useState<{ name: string; name_ar: string; price: number; currency: string; job_posts_limit: number } | null>(null);
 
   // Interactive Live Module Simulation States
   const [pipelineCandidateStage, setPipelineCandidateStage] = useState("مؤهل للمقابلة");
@@ -275,7 +271,7 @@ export default function LandingPage() {
               { label: "الوظائف الشاغرة", href: "/careers" },
               { label: "المميزات والحلول", href: "#features" },
               { label: "معاينة النظام الحي", href: "#showcase" },
-              { label: "طلب عرض سعر", href: "#pricing" },
+              
               { label: "الأمان والموثوقية", href: "#security" },
             ].map((item) => (
               <a
@@ -350,7 +346,7 @@ export default function LandingPage() {
                 { label: "الوظائف الشاغرة", href: "/careers" },
                 { label: "المميزات والحلول", href: "#features" },
                 { label: "معاينة النظام الحي", href: "#showcase" },
-                { label: "طلب عرض سعر", href: "#pricing" },
+                
                 { label: "الأمان والموثوقية", href: "#security" },
               ].map((item) => (
                 <a
@@ -443,7 +439,7 @@ export default function LandingPage() {
                 </Link>
 
                 <Link
-                  to="#pricing"
+                  to="/contact"
                   className="w-full sm:w-auto bg-md-secondary-container text-md-on-secondary-container rounded-md3-full h-14 px-8 text-md3-title-sm font-bold flex items-center justify-center gap-2 hover:bg-md-secondary-container/80 transition-all border border-md-outline-variant/80"
                 >
                   <Building2 className="w-4 h-4" />
@@ -1191,143 +1187,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── 5. Dynamic Pricing Section (Connected Directly to Supabase subscription_plans) ── */}
-      <section id="pricing" className="py-24 bg-md-surface">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <div className="inline-flex items-center gap-2 bg-md-primary-container text-md-on-primary-container text-xs font-black px-4 py-1.5 rounded-md3-full mb-4">
-              <Database className="w-3.5 h-3.5" />
-              <span>حلول توظيف مرنة للمنشآت</span>
-            </div>
-            <h2 className="text-3xl sm:text-4xl font-black text-md-on-surface mb-4">
-              حلول مرنة تناسب حجم واحتياج كل منشأة
-            </h2>
-            <p className="text-md3-body-md text-md-on-surface-variant">
-              تعرّف على مزايا TawzeefX، ثم أرسل طلب عرض سعر ليتواصل معك الفريق عبر البريد أو الجوال.
-            </p>
-          </div>
-
-          {plansLoading ? (
-            <div className="flex justify-center py-16">
-              <div className="w-10 h-10 border-4 border-md-primary border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : (
-            <motion.div
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={staggerContainer}
-              className="grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto items-stretch"
-            >
-              {(dbPlans && dbPlans.length > 0 ? dbPlans : []).map((plan, idx) => {
-                const isPro = plan.name === "pro";
-                const isFree = plan.price === 0;
-
-                return (
-                  <motion.div
-                    key={plan.id || idx}
-                    variants={fadeUp}
-                    className={`rounded-md3-2xl p-8 flex flex-col justify-between transition-all duration-300 ${
-                      isPro
-                        ? "bg-md-primary text-md-on-primary shadow-md3-4 border-2 border-md-primary lg:-translate-y-2"
-                        : "bg-md-surface text-md-on-surface shadow-sm border border-md-outline-variant"
-                    }`}
-                  >
-                    <div>
-                      {isPro && (
-                        <div className="bg-md-on-primary text-md-primary text-xs font-black px-3.5 py-1 rounded-md3-full inline-block mb-4 shadow-sm">
-                          الباقة الأكثر اختياراً ⭐
-                        </div>
-                      )}
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="text-2xl font-black">{plan.name_ar || plan.name}</h3>
-                        <span
-                          className={`text-xs px-2.5 py-1 rounded-md3-full font-bold ${
-                            isPro
-                              ? "bg-md-on-primary/20 text-md-on-primary"
-                              : "bg-md-surface-container text-md-on-surface-variant"
-                          }`}
-                        >
-                          {plan.billing_period === "monthly" ? "شهري" : "سنوي"}
-                        </span>
-                      </div>
-
-                      <p
-                        className={`text-xs mb-6 ${
-                          isPro ? "text-md-on-primary/80" : "text-md-on-surface-variant"
-                        }`}
-                      >
-                        {plan.description || "باقة مخصصة لتلبية احتياجات التوظيف والاستقطاب"}
-                      </p>
-
-                      <div className="mb-6 flex items-baseline gap-1.5">
-                        {isFree ? (
-                          <span className="text-4xl font-black">مجاناً</span>
-                        ) : (
-                          <span className="text-2xl font-black leading-tight">عرض سعر عند الطلب</span>
-                        )}
-                      </div>
-
-                      <div
-                        className={`text-xs font-bold mb-6 pb-6 border-b ${
-                          isPro ? "border-md-on-primary/20" : "border-md-outline-variant"
-                        }`}
-                      >
-                        حد إعلانات الشواغر:{" "}
-                        <span className="font-mono">
-                          {plan.job_posts_limit === -1 ? "غير محدود" : `${plan.job_posts_limit} وظيفة`}
-                        </span>
-                      </div>
-
-                      {/* Features List */}
-                      <div className="space-y-3 mb-8">
-                        {(plan.features || []).map((feat: string, fIdx: number) => (
-                          <div key={fIdx} className="flex items-start gap-2.5 text-xs font-medium">
-                            <CheckCircle2
-                              className={`w-4 h-4 shrink-0 mt-0.5 ${
-                                isPro ? "text-md-on-primary" : "text-md-primary"
-                              }`}
-                            />
-                            <span>{feat}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {isFree ? (
-                      <Link
-                        to="/auth?mode=signup"
-                        className="w-full py-3.5 rounded-md3-full font-bold text-center text-sm transition-transform hover:scale-105 shadow-sm bg-md-primary text-md-on-primary"
-                      >
-                        ابدأ الاستخدام المجاني
-                      </Link>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setQuotePlan({
-                          name: plan.name,
-                          name_ar: plan.name_ar || plan.name,
-                          price: plan.price,
-                          currency: plan.currency,
-                          job_posts_limit: plan.job_posts_limit,
-                        })}
-                        className={`w-full py-3.5 rounded-md3-full font-bold text-center text-sm transition-transform hover:scale-105 shadow-sm ${
-                          isPro
-                            ? "bg-md-on-primary text-md-primary shadow-md3-2"
-                            : "bg-md-primary text-md-on-primary"
-                        }`}
-                      >
-                        طلب عرض سعر
-                      </button>
-                    )}
-                  </motion.div>
-                );
-              })}
-            </motion.div>
-          )}
-        </div>
-      </section>
-
       {/* ── 6. Security & Enterprise Compliance ── */}
       <section id="security" className="py-20 bg-md-surface-container-low border-t border-md-outline-variant">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -1424,7 +1283,6 @@ export default function LandingPage() {
               <ul className="space-y-3 text-xs font-bold">
                 <li><a href="#features" className="hover:text-md-primary transition-colors">المميزات والحلول</a></li>
                 <li><a href="#showcase" className="hover:text-md-primary transition-colors">معاينة النظام الحي</a></li>
-                <li><a href="#pricing" className="hover:text-md-primary transition-colors">باقات المنشآت</a></li>
                 <li><a href="#security" className="hover:text-md-primary transition-colors">الأمان والخصوصية</a></li>
               </ul>
             </div>
@@ -1474,7 +1332,6 @@ export default function LandingPage() {
         </div>
       </footer>
 
-      <QuoteRequestDialog plan={quotePlan} onClose={() => setQuotePlan(null)} />
     </div>
   );
 }
