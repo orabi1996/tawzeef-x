@@ -40,8 +40,8 @@ export default function Pricing() {
   return (
     <div className="min-h-screen bg-background" dir="rtl">
       <SEO
-        title="باقات وأسعار TawzeefX | خطط التوظيف الذكي للشركات وأصحاب الأعمال"
-        description="تعرف على باقات وخطط أسعار TawzeefX للتوظيف واستقطاب الكفاءات ونشر الوظائف. باقات مرنة تناسب الشركات ومسؤولي التوظيف بمختلف الأحجام."
+        title="اطلب عرض سعر TawzeefX | حلول إدارة التوظيف للشركات"
+        description="استكشف حلول TawzeefX لإدارة الوظائف والمرشحين والمقابلات، وأرسل طلب عرض سعر يناسب احتياجات شركتك."
         canonical="https://www.tawzeefx.com/pricing"
       />
       {/* Header */}
@@ -68,13 +68,13 @@ export default function Pricing() {
           className="text-center mb-16"
         >
           <Badge variant="outline" className="mb-4 px-4 py-1.5 text-sm font-semibold">
-            💰 خطط الأسعار والاشتراكات
+            حلول TawzeefX للمنشآت
           </Badge>
           <h1 className="text-4xl md:text-5xl font-black text-foreground mb-4" style={{ fontFamily: "'Cairo', sans-serif" }}>
-            اختر الباقة المناسبة لشركتك
+            اختر الحل المناسب لاحتياجات التوظيف
           </h1>
           <p className="text-lg text-muted-foreground max-w-xl mx-auto" style={{ fontFamily: "'Cairo', sans-serif" }}>
-            ابدأ مجاناً وقدم طلب ترقية الباقة حسب احتياجاتك ليقوم فريق الإدارة بتفعيلها فوراً.
+            استعرض مزايا الخطط وأرسل طلب عرض سعر؛ سيتواصل معك فريق TawzeefX عبر البريد الإلكتروني أو الجوال.
           </p>
         </motion.div>
 
