@@ -304,7 +304,7 @@ export default function LandingPage() {
               تسجيل الدخول
             </Link>
             <Link
-              to="#pricing"
+              to="/auth?mode=signup"
               className="bg-md-primary text-md-on-primary text-md3-label-lg font-bold px-6 py-2.5 rounded-md3-full shadow-md3-1 hover:shadow-md3-3 transition-all hover:scale-105"
             >
               ابدأ مجاناً
@@ -373,7 +373,7 @@ export default function LandingPage() {
                 تسجيل الدخول
               </Link>
               <Link
-                to="#pricing"
+                to="/auth?mode=signup"
                 onClick={() => setMobileMenuOpen(false)}
                 className="w-full py-3.5 text-center rounded-md3-full bg-md-primary text-md-on-primary font-bold shadow-md3-2"
               >
@@ -1296,7 +1296,7 @@ export default function LandingPage() {
 
                     {isFree ? (
                       <Link
-                        to="#pricing"
+                        to="/auth?mode=signup"
                         className="w-full py-3.5 rounded-md3-full font-bold text-center text-sm transition-transform hover:scale-105 shadow-sm bg-md-primary text-md-on-primary"
                       >
                         ابدأ الاستخدام المجاني
@@ -1358,7 +1358,7 @@ export default function LandingPage() {
               </div>
               <div className="lg:col-span-4 flex justify-center lg:justify-end">
                 <Link
-                  to="#pricing"
+                  to="/auth?mode=signup"
                   className="bg-md-primary text-md-on-primary rounded-md3-full px-8 py-4 text-sm font-bold shadow-md3-2 hover:shadow-md3-4 hover:scale-105 transition-all text-center"
                 >
                   إنشاء حساب مسؤولي المنشأة
@@ -1382,7 +1382,7 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
-                to="#pricing"
+                to="/auth?mode=signup"
                 className="w-full sm:w-auto bg-md-primary text-md-on-primary rounded-md3-full h-14 px-10 text-md3-title-sm font-bold flex items-center justify-center gap-2 shadow-md3-2 hover:shadow-md3-4 hover:scale-105 transition-all"
               >
                 <span>إنشاء حساب والبدء فوراً</span>
@@ -1452,7 +1452,7 @@ export default function LandingPage() {
                   دخول لوحة تحكم المنشأة ←
                 </Link>
                 <Link
-                  to="#pricing"
+                  to="/auth?mode=signup"
                   className="block text-md-on-surface hover:text-md-primary transition-colors"
                 >
                   تسجيل منشأة جديدة
