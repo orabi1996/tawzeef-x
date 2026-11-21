@@ -16,6 +16,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
 import { SEO } from "@/components/marketing/SEO";
 import { useSubscriptionPlans } from "@/hooks/useSubscription";
+import QuoteRequestDialog from "@/components/marketing/QuoteRequestDialog";
 
 // --- System Showcase Modules ---
 const SYSTEM_MODULES = [
@@ -174,6 +175,7 @@ export default function LandingPage() {
 
   const [realCompanies, setRealCompanies] = useState<Array<{ id: string; name: string; logo_url: string | null }>>([]);
   const { data: dbPlans, isLoading: plansLoading } = useSubscriptionPlans();
+  const [quotePlan, setQuotePlan] = useState<{ name: string; name_ar: string; price: number; currency: string; job_posts_limit: number } | null>(null);
 
   // Interactive Live Module Simulation States
   const [pipelineCandidateStage, setPipelineCandidateStage] = useState("مؤهل للمقابلة");
@@ -1301,16 +1303,32 @@ export default function LandingPage() {
                       </div>
                     </div>
 
-                    <Link
-                      to="/auth?mode=signup"
-                      className={`w-full py-3.5 rounded-md3-full font-bold text-center text-sm transition-transform hover:scale-105 shadow-sm ${
-                        isPro
-                          ? "bg-md-on-primary text-md-primary shadow-md3-2"
-                          : "bg-md-primary text-md-on-primary"
-                      }`}
-                    >
-                      {isFree ? "ابدأ الاستخدام المجاني" : "اختيار هذه الباقة"}
-                    </Link>
+                    {isFree ? (
+                      <Link
+                        to="/auth?mode=signup"
+                        className="w-full py-3.5 rounded-md3-full font-bold text-center text-sm transition-transform hover:scale-105 shadow-sm bg-md-primary text-md-on-primary"
+                      >
+                        ابدأ الاستخدام المجاني
+                      </Link>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setQuotePlan({
+                          name: plan.name,
+                          name_ar: plan.name_ar || plan.name,
+                          price: plan.price,
+                          currency: plan.currency,
+                          job_posts_limit: plan.job_posts_limit,
+                        })}
+                        className={`w-full py-3.5 rounded-md3-full font-bold text-center text-sm transition-transform hover:scale-105 shadow-sm ${
+                          isPro
+                            ? "bg-md-on-primary text-md-primary shadow-md3-2"
+                            : "bg-md-primary text-md-on-primary"
+                        }`}
+                      >
+                        طلب عرض سعر
+                      </button>
+                    )}
                   </motion.div>
                 );
               })}
@@ -1464,6 +1482,8 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
+
+      <QuoteRequestDialog plan={quotePlan} onClose={() => setQuotePlan(null)} />
     </div>
   );
 }
