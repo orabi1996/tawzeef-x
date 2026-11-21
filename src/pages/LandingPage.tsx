@@ -25,7 +25,7 @@ const SYSTEM_MODULES = [
     title: "الفرز والتقييم بالذكاء الاصطناعي",
     subtitle: "AI Resume Screening & Scorecards",
     icon: Bot,
-    badge: "دقة مطابقة 96%",
+    badge: "تحليل وترتيب المرشحين",
     badgeColor: "bg-md-primary-container text-md-on-primary-container",
   },
   {
@@ -49,7 +49,7 @@ const SYSTEM_MODULES = [
     title: "العروض الوظيفية والتوقيع الإلكتروني",
     subtitle: "Digital Offers & E-Signature",
     icon: FileCheck,
-    badge: "توقيع مشفر قانوني",
+    badge: "إدارة العروض إلكترونياً",
     badgeColor: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20",
   },
   {
@@ -66,8 +66,8 @@ const FEATURES_LIST = [
   {
     icon: Bot,
     title: "محرك الفرز والتقييم الذكي",
-    description: "مطابقة السير الذاتية وتحليل الخبرات والمهارات بدقة متناهية بالذكاء الاصطناعي مع تحديد نقاط القوة وفرص التطوير.",
-    highlight: "توفير 80% من زمن الفرز",
+    description: "تحليل السير الذاتية والخبرات والمهارات لدعم فرز المرشحين وتقييمهم بالذكاء الاصطناعي.",
+    highlight: "دعم وتسريع فرز السير الذاتية",
     color: "bg-md-primary-container text-md-on-primary-container",
   },
   {
@@ -80,14 +80,14 @@ const FEATURES_LIST = [
   {
     icon: Video,
     title: "غرف مقابلات فيديو مدمجة",
-    description: "إجراء المقابلات مباشرة من المنصة دون برامج خارجية، مع تسجيل رقمي وتفريغ نصي وتحليل نبرة الحوار.",
-    highlight: "تفريغ صوتي بـ ElevenLabs",
+    description: "تنظيم المقابلات ومتابعة مراحلها من داخل منصة التوظيف.",
+    highlight: "تنظيم ومتابعة المقابلات",
     color: "bg-md-tertiary-container text-md-on-tertiary-container",
   },
   {
     icon: FileText,
     title: "عروض وظيفية رقمية وتوقيع حي",
-    description: "إنشاء عروض وظيفية احترافية بحسابات الرواتب والبدلات بالريال السعودي، وتوقيع إلكتروني آمن موثق برمز استجابة.",
+    description: "إنشاء وإدارة العروض الوظيفية ومتابعة قبولها إلكترونياً.",
     highlight: "توقيع إلكتروني فوري",
     color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20",
   },
@@ -101,19 +101,19 @@ const FEATURES_LIST = [
   {
     icon: Shield,
     title: "أمان وعزل بيانات المؤسسات",
-    description: "عزل كامل لبيانات كل شركة عبر سياسات Row-Level Security، وتشفير AES-GCM للمعلومات الحساسة، وسجل تدقيق شامل.",
-    highlight: "RLS + تشفير 256-bit",
+    description: "إدارة صلاحيات المستخدمين ومتابعة الأنشطة من خلال سجل تدقيق داخل المنصة.",
+    highlight: "صلاحيات وسجل تدقيق",
     color: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20",
   },
 ];
 
 const COMPLIANCE_ITEMS = [
-  { label: "عزل بيانات المنشآت (RLS)", icon: ShieldCheck },
-  { label: "تشفير سحابي AES-GCM", icon: Lock },
-  { label: "متوافق مع لوائح العمل والتوظيف", icon: Building2 },
-  { label: "استجابة ذكاء اصطناعي فائقة", icon: Cpu },
-  { label: "بنية تحتية سحابية 99.9%", icon: Server },
-  { label: "مصفوفة صلاحيات دقيقة للأدوار", icon: KeyRound },
+  { label: "واجهة عربية وإنجليزية", icon: Globe },
+  { label: "مراحل توظيف قابلة للتخصيص", icon: Layers },
+  { label: "إدارة الوظائف والمرشحين", icon: Building2 },
+  { label: "مساعدة بالذكاء الاصطناعي", icon: Cpu },
+  { label: "تقارير ومؤشرات توظيف", icon: BarChart3 },
+  { label: "صلاحيات حسب الأدوار", icon: KeyRound },
 ];
 
 const RECENT_SYSTEM_EVENTS = [
@@ -1339,10 +1339,10 @@ export default function LandingPage() {
                   <span>حماية البيانات والخصوصية المؤسسية</span>
                 </div>
                 <h3 className="text-2xl sm:text-3xl font-black text-md-on-surface mb-3">
-                  بيانات منشأتك ومرشحيك معزولة ومشفرة بأعلى المقاييس
+                  تحكم في الصلاحيات ومتابعة أنشطة المستخدمين
                 </h3>
                 <p className="text-sm text-md-on-surface-variant leading-relaxed mb-6 font-medium">
-                  نطبق معايير العزل على مستوى الصفوف (Row Level Security)، وتشفير السجلات الحساسة، وسجل تدقيق تفصيلي للأنشطة والعمليات.
+                  تساعدك صلاحيات الأدوار وسجل الأنشطة على تنظيم الوصول ومراجعة العمليات داخل TawzeefX.
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {COMPLIANCE_ITEMS.map((item, i) => (
