@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
-import { Mail, Phone, MapPin, Clock, Send, CheckCircle2, Loader2 } from "lucide-react";
+import { Mail, MapPin, Clock, Send, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -38,7 +38,7 @@ export default function Contact() {
 
   const info = [
     { icon: Mail, title: t("contact.info.email"), value: "tawzeefx@outlook.com", href: "mailto:tawzeefx@outlook.com" },
-    { icon: Phone, title: t("contact.info.phone"), value: "+966 50 000 0000", href: "tel:+966500000000" },
+
     { icon: MapPin, title: t("contact.info.location"), value: t("contact.info.locationValue") },
     { icon: Clock, title: t("contact.info.hours"), value: t("contact.info.hoursValue") },
   ];
